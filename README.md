@@ -2,9 +2,6 @@
 
 A full-stack secure travel booking web application built as a final semester capstone project.
 
-## 👩‍💻 Built By
-**Vumika Shrestha**
-Final Semester Capstone Project — 2026
 
 ---
 
