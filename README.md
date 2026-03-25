@@ -164,10 +164,7 @@ feature/*     ← individual feature branches
 
 ---
 
-## 📸 Screenshots
-*(Add screenshots of your running application here)*
 
 ---
 
-## 📄 License
-This project is for educational purposes only.
+
