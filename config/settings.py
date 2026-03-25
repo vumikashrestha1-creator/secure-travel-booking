@@ -30,6 +30,12 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+
+    # Our apps
+    'users',
+    'bookings',
+    'listings',
+    'payments',
 ]
 
 # ─── Middleware ───────────────────────────────────────────────────────────────
@@ -135,3 +141,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# Custom User Model
+AUTH_USER_MODEL = 'users.User'
