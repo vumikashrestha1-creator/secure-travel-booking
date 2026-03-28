@@ -58,7 +58,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     # ── Account Status ───────────────────────────────────────────
     is_active    = models.BooleanField(default=True)
     is_staff     = models.BooleanField(default=False)
-    is_verified  = models.BooleanField(default=False)  # For email verification later
+    is_verified  = models.BooleanField(default=False) 
+    failed_login_attempts = models.IntegerField(default=0)
+    last_failed_login     = models.DateTimeField(null=True, blank=True) # For email verification later
 
     # ── Timestamps ───────────────────────────────────────────────
     date_joined  = models.DateTimeField(auto_now_add=True)
