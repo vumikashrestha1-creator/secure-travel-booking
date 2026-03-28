@@ -25,18 +25,17 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # Third-party apps
-    'rest_framework',
-    'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',
-    'corsheaders',
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",  # enables logout/blacklisting
+    "corsheaders",
 
-    # Our apps
-    'users',
-    'bookings',
-    'listings',
-    'payments',
+    # Local apps
+    "apps.users",
 ]
+
+# ── Custom User Model
+AUTH_USER_MODEL = "users.User"
 
 # ─── Middleware ───────────────────────────────────────────────────────────────
 MIDDLEWARE = [
@@ -49,6 +48,47 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+# ── DRF Settings ─────────────────────────────────
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+    "DEFAULT_RENDERER_CLASSES": (
+        "rest_framework.renderers.JSONRenderer",
+    ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,
+}
+
+# ── JWT Settings ─────────────────────────────────
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME":  timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS":  True,   # issues new refresh token on every refresh
+    "BLACKLIST_AFTER_ROTATION": True, # old refresh tokens become invalid
+    "AUTH_HEADER_TYPES":      ("Bearer",),
+    "USER_ID_FIELD":          "id",
+    "USER_ID_CLAIM":          "user_id",
+    "AUTH_TOKEN_CLASSES":     ("rest_framework_simplejwt.tokens.AccessToken",),
+}
+
+# ── CORS Settings ────────────────────────────────
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",   # React Vite dev server
+    "http://localhost:3000",   # React CRA dev server (if used)
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# ── Media Files (profile pictures) ───────────────
+import os
+MEDIA_URL  = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 ROOT_URLCONF = 'config.urls'
 
