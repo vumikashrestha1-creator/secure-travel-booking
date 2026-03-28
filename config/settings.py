@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    # Third-party
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",  # enables logout/blacklisting
@@ -32,6 +33,8 @@ INSTALLED_APPS = [
 
     # Local apps
     "apps.users",
+    "apps.listings",
+    "apps.bookings",
 ]
 
 # ── Custom User Model
