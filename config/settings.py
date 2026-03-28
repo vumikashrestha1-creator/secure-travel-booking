@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "apps.users",
     "apps.listings",
     "apps.bookings",
+    "apps.payments",
 ]
 
 # ── Custom User Model
