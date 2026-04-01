@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "apps.listings",
     "apps.bookings",
     "apps.payments",
+    "apps.audit",
 ]
 
 # ── Custom User Model
@@ -45,6 +46,8 @@ AUTH_USER_MODEL = "users.User"
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',          # Must be at the top
     'django.middleware.security.SecurityMiddleware',
+    "apps.audit.middleware.SecurityHeadersMiddleware", 
+    "apps.audit.middleware.RequestLoggingMiddleware", 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -188,3 +191,105 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
+
+# ── Rate Limiting ─────────────────────────────────────────────────
+# What this does: Limits how many times per minute someone can
+# call your login endpoint. Protects against automated bots
+# that try thousands of passwords per second.
+RATELIMIT_ENABLE = True
+RATELIMIT_USE_CACHE = "default"
+
+# ── Cache (needed for rate limiting) ─────────────────────────────
+# What this does: Stores rate limit counters in memory.
+# When someone hits the login endpoint, the counter goes up.
+# When it hits the limit, they are blocked for a period.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
+
+# ── Password Validation ───────────────────────────────────────────
+# What this does: Forces users to create strong passwords.
+# Weak passwords are rejected before they reach the database.
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        # Rejects passwords that are too similar to the username or email
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+    },
+    {
+        # Rejects passwords shorter than 8 characters
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 8},
+    },
+    {
+        # Rejects common passwords like "password123"
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        # Rejects passwords that are entirely numbers
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+]
+
+# ── Security Headers ──────────────────────────────────────────────
+# What this does: These settings tell Django to add extra
+# security instructions to every response it sends.
+
+# Prevents your site from being put inside another site's iframe
+# This stops clickjacking attacks where a hacker puts your site
+# inside an invisible frame to steal clicks
+X_FRAME_OPTIONS = "DENY"
+
+# Stops browsers from guessing the file type of responses
+# Prevents MIME sniffing attacks where a browser runs
+# a text file as JavaScript
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# ── Logging ───────────────────────────────────────────────────────
+# What this does: Sets up Python logging so that your
+# RequestLoggingMiddleware can actually write to the console.
+# Every API request will be printed in the terminal.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "loggers": {
+        "apps.audit": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": True,
+        },
+    },
+}
+
+# ── CORS Tightening ───────────────────────────────────────────────
+# What this does: Restricts which websites can talk to your API.
+# Only your React frontend is allowed.
+# Any other website trying to call your API is blocked.
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+CORS_ALLOW_CREDENTIALS = True
+
+# These are the only HTTP methods allowed from the frontend
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]

@@ -1,3 +1,6 @@
+from apps.audit.models import AuditLog
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 from rest_framework              import status, generics
 from rest_framework.response     import Response
 from rest_framework.views        import APIView
@@ -23,12 +26,9 @@ from .permissions import IsAdmin
 def get_tokens_for_user(user):
     """Generate JWT access + refresh tokens for a given user."""
     refresh = RefreshToken.for_user(user)
-
-    # Add custom claims to the token payload
     refresh["email"] = user.email
     refresh["role"]  = user.role
     refresh["name"]  = user.full_name
-
     return {
         "refresh": str(refresh),
         "access":  str(refresh.access_token),
@@ -44,14 +44,24 @@ class RegisterView(APIView):
         if serializer.is_valid():
             user   = serializer.save()
             tokens = get_tokens_for_user(user)
+
+            # ── Audit log: new registration ────────────────────
+            AuditLog.log(
+                action         = AuditLog.Action.REGISTER,
+                user           = user,
+                request        = request,
+                description    = f"New account created for {user.email}.",
+                was_successful = True,
+            )
+
             return Response(
                 {
                     "message": "Account created successfully.",
                     "user": {
-                        "id":         user.id,
-                        "email":      user.email,
-                        "full_name":  user.full_name,
-                        "role":       user.role,
+                        "id":        user.id,
+                        "email":     user.email,
+                        "full_name": user.full_name,
+                        "role":      user.role,
                     },
                     "tokens": tokens,
                 },
@@ -61,6 +71,10 @@ class RegisterView(APIView):
 
 
 # ── Login ─────────────────────────────────────────────────────────
+@method_decorator(
+    ratelimit(key="ip", rate="5/m", method="POST", block=True),
+    name="dispatch"
+)
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -72,9 +86,18 @@ class LoginView(APIView):
             user   = serializer.validated_data["user"]
             tokens = get_tokens_for_user(user)
 
-            # Update last login
+            # Update last login timestamp
             user.last_login = timezone.now()
             user.save(update_fields=["last_login"])
+
+            # ── Audit log: successful login ────────────────────
+            AuditLog.log(
+                action         = AuditLog.Action.LOGIN,
+                user           = user,
+                request        = request,
+                description    = f"User {user.email} logged in successfully.",
+                was_successful = True,
+            )
 
             return Response(
                 {
@@ -89,7 +112,22 @@ class LoginView(APIView):
                 },
                 status=status.HTTP_200_OK,
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # ── Audit log: failed login ────────────────────────────
+        email = request.data.get("email", "unknown")
+        AuditLog.log(
+            action         = AuditLog.Action.LOGIN_FAILED,
+            user           = None,
+            request        = request,
+            description    = f"Failed login attempt for email: {email}",
+            was_successful = False,
+            extra_data     = {"attempted_email": email},
+        )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 # ── Logout ────────────────────────────────────────────────────────
@@ -105,7 +143,17 @@ class LogoutView(APIView):
             )
         try:
             token = RefreshToken(refresh_token)
-            token.blacklist()  # invalidates the token permanently
+            token.blacklist()
+
+            # ── Audit log: logout ──────────────────────────────
+            AuditLog.log(
+                action         = AuditLog.Action.LOGOUT,
+                user           = request.user,
+                request        = request,
+                description    = f"User {request.user.email} logged out.",
+                was_successful = True,
+            )
+
             return Response(
                 {"message": "Logged out successfully."},
                 status=status.HTTP_200_OK,
@@ -132,7 +180,10 @@ class ProfileView(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response(
-                {"message": "Profile updated successfully.", "user": serializer.data},
+                {
+                    "message": "Profile updated successfully.",
+                    "user":    serializer.data
+                },
                 status=status.HTTP_200_OK,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -147,10 +198,27 @@ class ChangePasswordView(APIView):
             data=request.data, context={"request": request}
         )
         if serializer.is_valid():
-            request.user.set_password(serializer.validated_data["new_password"])
+            request.user.set_password(
+                serializer.validated_data["new_password"]
+            )
             request.user.save()
+
+            # ── Audit log: password changed ────────────────────
+            AuditLog.log(
+                action         = AuditLog.Action.PASSWORD_CHANGE,
+                user           = request.user,
+                request        = request,
+                description    = f"Password changed for {request.user.email}.",
+                was_successful = True,
+            )
+
             return Response(
-                {"message": "Password changed successfully. Please log in again."},
+                {
+                    "message": (
+                        "Password changed successfully. "
+                        "Please log in again."
+                    )
+                },
                 status=status.HTTP_200_OK,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -166,12 +234,10 @@ class AdminUserListView(generics.ListAPIView):
         queryset = super().get_queryset()
         role     = self.request.query_params.get("role")
         search   = self.request.query_params.get("search")
-
         if role:
             queryset = queryset.filter(role=role.upper())
         if search:
             queryset = queryset.filter(email__icontains=search)
-
         return queryset
 
 
@@ -189,7 +255,8 @@ class AdminUserDetailView(APIView):
         user = self.get_object(pk)
         if not user:
             return Response(
-                {"error": "User not found."}, status=status.HTTP_404_NOT_FOUND
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND
             )
         serializer = AdminUserSerializer(user)
         return Response(serializer.data)
@@ -198,24 +265,57 @@ class AdminUserDetailView(APIView):
         user = self.get_object(pk)
         if not user:
             return Response(
-                {"error": "User not found."}, status=status.HTTP_404_NOT_FOUND
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND
             )
-        serializer = AdminUserSerializer(user, data=request.data, partial=True)
+        serializer = AdminUserSerializer(
+            user, data=request.data, partial=True
+        )
         if serializer.is_valid():
             serializer.save()
+
+            # ── Audit log: user updated by admin ───────────────
+            AuditLog.log(
+                action         = AuditLog.Action.USER_DEACTIVATED
+                                 if not serializer.validated_data.get(
+                                     "is_active", True
+                                 ) else AuditLog.Action.BOOKING_UPDATED,
+                user           = request.user,
+                request        = request,
+                description    = f"Admin updated user ID {pk}.",
+                was_successful = True,
+                extra_data     = {"updated_user_id": pk},
+            )
+
             return Response(
                 {"message": "User updated.", "user": serializer.data}
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     def delete(self, request, pk):
         user = self.get_object(pk)
         if not user:
             return Response(
-                {"error": "User not found."}, status=status.HTTP_404_NOT_FOUND
+                {"error": "User not found."},
+                status=status.HTTP_404_NOT_FOUND
             )
-        user.is_active = False  # soft delete — never hard delete users
+
+        user.is_active = False
         user.save()
+
+        # ── Audit log: user deactivated ────────────────────────
+        AuditLog.log(
+            action         = AuditLog.Action.USER_DEACTIVATED,
+            user           = request.user,
+            request        = request,
+            description    = f"Admin deactivated user {user.email}.",
+            was_successful = True,
+            extra_data     = {"deactivated_user": user.email},
+        )
+
         return Response(
             {"message": "User deactivated successfully."},
             status=status.HTTP_200_OK,

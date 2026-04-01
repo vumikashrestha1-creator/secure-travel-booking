@@ -1,5 +1,7 @@
 # users/views.py
 
+from apps.audit.models import AuditLog
+
 from rest_framework              import generics, status, permissions
 from rest_framework.response     import Response
 from rest_framework.views        import APIView
@@ -18,119 +20,127 @@ from .serializers import (
 User = get_user_model()
 
 
-class RegisterView(generics.CreateAPIView):
-    """
-    POST /api/auth/register/
-    Register a new user. No authentication required.
-    """
-    queryset            = User.objects.all()
-    serializer_class    = RegisterSerializer
-    permission_classes  = [permissions.AllowAny]
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        return Response({
-            'message': 'Registration successful.',
-            'user': {
-                'id':         user.id,
-                'email':      user.email,
-                'full_name':  user.full_name,
-                'role':       user.role,
-            }
-        }, status=status.HTTP_201_CREATED)
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user   = serializer.save()
+            tokens = get_tokens_for_user(user)
 
+            # ── Audit log: new registration ────────────────
+            AuditLog.log(
+                action      = AuditLog.Action.REGISTER,
+                user        = user,
+                request     = request,
+                description = f"New account created for {user.email}",
+                was_successful = True,
+            )
+
+            return Response(
+                {
+                    "message": "Account created successfully.",
+                    "user": {
+                        "id":        user.id,
+                        "email":     user.email,
+                        "full_name": user.full_name,
+                        "role":      user.role,
+                    },
+                    "tokens": tokens,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 class LoginView(APIView):
-    """
-    POST /api/auth/login/
-    Login with email and password.
-    Returns JWT access and refresh tokens.
-    No authentication required.
-    """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [AllowAny]
 
     def post(self, request):
-        email    = request.data.get('email', '').strip().lower()
-        password = request.data.get('password', '')
+        serializer = LoginSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        if serializer.is_valid():
+            user   = serializer.validated_data["user"]
+            tokens = get_tokens_for_user(user)
 
-        # Validate input
-        if not email or not password:
-            return Response(
-                {'error': 'Email and password are required.'},
-                status=status.HTTP_400_BAD_REQUEST
+            user.last_login = timezone.now()
+            user.save(update_fields=["last_login"])
+
+            # ── Audit log: successful login ────────────────
+            AuditLog.log(
+                action      = AuditLog.Action.LOGIN,
+                user        = user,
+                request     = request,
+                description = f"User {user.email} logged in successfully.",
+                was_successful = True,
             )
 
-        # Find the user
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
             return Response(
-                {'error': 'Invalid email or password.'},
-                status=status.HTTP_401_UNAUTHORIZED
+                {
+                    "message": "Login successful.",
+                    "user": {
+                        "id":        user.id,
+                        "email":     user.email,
+                        "full_name": user.full_name,
+                        "role":      user.role,
+                    },
+                    "tokens": tokens,
+                },
+                status=status.HTTP_200_OK,
             )
 
-        # Check password
-        if not user.check_password(password):
-            return Response(
-                {'error': 'Invalid email or password.'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+        # ── Audit log: failed login ────────────────────────
+        email = request.data.get("email", "unknown")
+        AuditLog.log(
+            action      = AuditLog.Action.LOGIN_FAILED,
+            user        = None,
+            request     = request,
+            description = f"Failed login attempt for email: {email}",
+            was_successful = False,
+            extra_data  = {"attempted_email": email},
+        )
 
-        # Check account is active
-        if not user.is_active:
-            return Response(
-                {'error': 'Your account has been deactivated.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
-
-        return Response({
-            'message': 'Login successful.',
-            'tokens': {
-                'access':  str(refresh.access_token),
-                'refresh': str(refresh),
-            },
-            'user': {
-                'id':        user.id,
-                'email':     user.email,
-                'full_name': user.full_name,
-                'role':      user.role,
-            }
-        }, status=status.HTTP_200_OK)
-
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 class LogoutView(APIView):
-    """
-    POST /api/auth/logout/
-    Blacklists the refresh token so it can't be used again.
-    Requires authentication.
-    """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        refresh_token = request.data.get('refresh')
-
+        refresh_token = request.data.get("refresh")
         if not refresh_token:
             return Response(
-                {'error': 'Refresh token is required.'},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Refresh token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-
         try:
             token = RefreshToken(refresh_token)
-            token.blacklist()   # Invalidate the token
+            token.blacklist()
+
+            # ── Audit log: logout ──────────────────────────
+            AuditLog.log(
+                action      = AuditLog.Action.LOGOUT,
+                user        = request.user,
+                request     = request,
+                description = f"User {request.user.email} logged out.",
+                was_successful = True,
+            )
+
             return Response(
-                {'message': 'Logged out successfully.'},
-                status=status.HTTP_200_OK
+                {"message": "Logged out successfully."},
+                status=status.HTTP_200_OK,
             )
         except TokenError:
             return Response(
-                {'error': 'Invalid or expired token.'},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
 
