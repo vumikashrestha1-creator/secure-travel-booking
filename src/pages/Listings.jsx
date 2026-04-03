@@ -35,8 +35,9 @@ export default function Listings() {
     setLoading(true);
     try {
       const res = await api.get('/listings/');
-      setListings(res.data);
-      setFiltered(res.data);
+const data = Array.isArray(res.data) ? res.data : res.data.results || [];
+setListings(data);
+setFiltered(data);
     } catch (err) {
       setError('Failed to load listings. Please try again.');
     } finally {
