@@ -25,9 +25,9 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const [profileRes, bookingsRes, paymentsRes] = await Promise.all([
-        api.get('/auth/profile/'),
-        api.get('/bookings/my-bookings/'),
-        api.get('/payments/my-payments/'),
+        api.get('/users/profile/'),
+	api.get('/bookings/my-bookings/'),
+	api.get('/payments/my-payments/'),
       ]);
       setProfile(profileRes.data);
       setBookings(bookingsRes.data);

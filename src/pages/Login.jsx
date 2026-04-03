@@ -18,19 +18,15 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post('/auth/login/', form);
-      localStorage.setItem('access_token', res.data.access);
-      localStorage.setItem('refresh_token', res.data.refresh);
-      // Save role for role-based routing (Week 5)
-      if (res.data.role) {
-        localStorage.setItem('user_role', res.data.role);
-      }
-      // Redirect admin users to admin dashboard, customers to customer dashboard
-      if (res.data.role === 'ADMIN') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      const res = await api.post('/users/login/', form);
+      localStorage.setItem('access_token', res.data.tokens.access);
+	localStorage.setItem('refresh_token', res.data.tokens.refresh);
+	localStorage.setItem('user_role', res.data.user.role);
+	if (res.data.user.role === 'ADMIN') {
+ 	 navigate('/admin');
+	} else {
+  	navigate('/dashboard');
+	}
     } catch (err) {
       setError('Invalid email or password. Please try again.');
     } finally {

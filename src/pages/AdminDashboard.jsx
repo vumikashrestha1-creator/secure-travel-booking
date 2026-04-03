@@ -30,14 +30,14 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const [bookingsRes, paymentsRes] = await Promise.all([
-        api.get('/bookings/all/'),
-        api.get('/payments/all/'),
+        api.get('/bookings/admin/all/'),
+	api.get('/payments/admin/all/'),
       ]);
-      setBookings(bookingsRes.data);
-      setPayments(paymentsRes.data);
+      setBookings(Array.isArray(bookingsRes.data) ? bookingsRes.data : 	bookingsRes.data.results || []);
+	setPayments(Array.isArray(paymentsRes.data) ? paymentsRes.data : 	paymentsRes.data.results || []);
       // Audit logs endpoint — gracefully handle if not yet implemented
       try {
-        const auditRes = await api.get('/auth/audit-logs/');
+        const auditRes = await api.get('/users/audit-logs/');
         setAuditLogs(auditRes.data);
       } catch {
         setAuditLogs([]);
