@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import axios from 'axios';
+const publicApi = axios.create({ baseURL: 'http://127.0.0.1:8000/api' });
 import './Listings.css';
 
 export default function Listings() {
@@ -34,7 +35,7 @@ export default function Listings() {
   const fetchListings = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/listings/');
+      const res = await publicApi.get('/listings/');
 const data = Array.isArray(res.data) ? res.data : res.data.results || [];
 setListings(data);
 setFiltered(data);
