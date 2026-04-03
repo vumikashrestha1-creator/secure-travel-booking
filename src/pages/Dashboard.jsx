@@ -30,8 +30,8 @@ export default function Dashboard() {
 	api.get('/payments/my-payments/'),
       ]);
       setProfile(profileRes.data);
-      setBookings(bookingsRes.data);
-      setPayments(paymentsRes.data);
+setBookings(Array.isArray(bookingsRes.data) ? bookingsRes.data : bookingsRes.data.results || []);
+setPayments(Array.isArray(paymentsRes.data) ? paymentsRes.data : paymentsRes.data.results || []);
     } catch (err) {
       setError('Failed to load dashboard data. Please try again.');
     } finally {
