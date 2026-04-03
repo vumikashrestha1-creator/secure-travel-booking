@@ -24,8 +24,8 @@ export default function Home() {
           </h1>
           <p className="hero-subtitle">
             Book flights, hotels and travel packages with confidence.
-            Your data is protected with AES-256 encryption, multi-factor
-            authentication and real-time fraud detection.
+            Get the best deals, instant booking confirmation and
+            24/7 support — all in one place.
           </p>
           <div className="hero-buttons">
             <button className="btn-primary" onClick={() => navigate('/login')}>
@@ -64,7 +64,7 @@ export default function Home() {
             <span className="card-icon">🔒</span>
             <div className="card-text">
               <div className="card-title">Secure</div>
-              <div className="card-sub">AES-256 encrypted</div>
+              <div className="card-sub">Safe & encrypted</div>
             </div>
           </div>
         </div>
@@ -75,24 +75,51 @@ export default function Home() {
         <h2 className="features-title">Why Choose STBS?</h2>
         <div className="features-grid">
           <div className="feature-card">
-            <div className="feature-icon">🔐</div>
-            <h3>JWT Authentication</h3>
-            <p>Secure login with JSON Web Tokens and multi-factor authentication to protect your account.</p>
+            <div className="feature-icon">✈️</div>
+            <h3>Easy Booking</h3>
+            <p>Book flights, hotels and travel packages in just a few clicks. Instant confirmation sent straight to you.</p>
           </div>
           <div className="feature-card">
             <div className="feature-icon">💳</div>
             <h3>Safe Payments</h3>
-            <p>PCI DSS compliant payment processing with tokenization. Your card details are never stored.</p>
+            <p>Your payment details are always protected. We never store your full card number — your money is safe with us.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">👥</div>
-            <h3>Role Based Access</h3>
-            <p>Separate dashboards for customers, travel agents and administrators with strict access control.</p>
+            <div className="feature-icon">🌍</div>
+            <h3>100+ Destinations</h3>
+            <p>Explore flights, hotels and packages to over 100 destinations worldwide. Your next adventure is waiting.</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">📋</div>
-            <h3>Audit Logging</h3>
-            <p>Every action is logged and monitored in real time for full transparency and accountability.</p>
+            <div className="feature-icon">🎧</div>
+            <h3>24/7 Support</h3>
+            <p>Our team is here whenever you need help. From booking to check-in, we have got you covered every step of the way.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="how-it-works">
+        <h2 className="features-title">How It Works</h2>
+        <div className="steps-grid">
+          <div className="step-card">
+            <div className="step-number">1</div>
+            <h3>Create an Account</h3>
+            <p>Sign up in seconds with just your name and email. No complicated forms.</p>
+          </div>
+          <div className="step-card">
+            <div className="step-number">2</div>
+            <h3>Browse & Choose</h3>
+            <p>Search flights, hotels and packages. Filter by type and find the perfect deal.</p>
+          </div>
+          <div className="step-card">
+            <div className="step-number">3</div>
+            <h3>Book Instantly</h3>
+            <p>Select your guests, confirm your booking and get an instant booking reference.</p>
+          </div>
+          <div className="step-card">
+            <div className="step-number">4</div>
+            <h3>Manage Your Trip</h3>
+            <p>View all your bookings and payments anytime from your personal dashboard.</p>
           </div>
         </div>
       </section>
