@@ -19,24 +19,24 @@ class Listing(models.Model):
         SOLDOUT  = "SOLDOUT",  "Sold Out"
 
     # ── Basic Info ────────────────────────────────────────────────
-    title           = models.CharField(max_length=255)
-    description     = models.TextField()
-    listing_type    = models.CharField(
+    title        = models.CharField(max_length=255)
+    description  = models.TextField()
+    listing_type = models.CharField(
         max_length=20,
         choices=ListingType.choices,
         default=ListingType.PACKAGE,
     )
-    status          = models.CharField(
+    status = models.CharField(
         max_length=20,
         choices=Status.choices,
         default=Status.ACTIVE,
     )
 
     # ── Location ──────────────────────────────────────────────────
-    origin          = models.CharField(max_length=100)
-    destination     = models.CharField(max_length=100)
-    country         = models.CharField(max_length=100)
-    city            = models.CharField(max_length=100)
+    origin      = models.CharField(max_length=100)
+    destination = models.CharField(max_length=100)
+    country     = models.CharField(max_length=100)
+    city        = models.CharField(max_length=100)
 
     # ── Pricing ───────────────────────────────────────────────────
     price_per_person = models.DecimalField(
@@ -50,27 +50,39 @@ class Listing(models.Model):
     )
 
     # ── Availability ──────────────────────────────────────────────
-    available_seats  = models.IntegerField(validators=[MinValueValidator(0)])
-    max_seats        = models.IntegerField(validators=[MinValueValidator(1)])
-    start_date       = models.DateField()
-    end_date         = models.DateField()
+    available_seats = models.IntegerField(
+        validators=[MinValueValidator(0)]
+    )
+    max_seats  = models.IntegerField(
+        validators=[MinValueValidator(1)]
+    )
+    start_date = models.DateField()
+    end_date   = models.DateField()
 
     # ── Details ───────────────────────────────────────────────────
-    duration_days    = models.IntegerField(validators=[MinValueValidator(1)])
-    includes_hotel   = models.BooleanField(default=False)
-    includes_flight  = models.BooleanField(default=False)
-    includes_meals   = models.BooleanField(default=False)
-    image            = models.ImageField(
+    duration_days   = models.IntegerField(validators=[MinValueValidator(1)])
+    includes_hotel  = models.BooleanField(default=False)
+    includes_flight = models.BooleanField(default=False)
+    includes_meals  = models.BooleanField(default=False)
+
+    # ── Images ────────────────────────────────────────────────────
+    image = models.ImageField(
         upload_to="listings/", blank=True, null=True
     )
-    rating           = models.DecimalField(
+    image_url = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="Direct URL to listing image — paste any photo link here"
+    )
+
+    # ── Rating ────────────────────────────────────────────────────
+    rating = models.DecimalField(
         max_digits=3, decimal_places=1,
         default=0.0,
         validators=[MinValueValidator(0), MaxValueValidator(5)]
     )
 
     # ── Who created it ────────────────────────────────────────────
-    created_by       = models.ForeignKey(
+    created_by = models.ForeignKey(
         "users.User",
         on_delete=models.SET_NULL,
         null=True,
@@ -78,13 +90,13 @@ class Listing(models.Model):
     )
 
     # ── Timestamps ────────────────────────────────────────────────
-    created_at       = models.DateTimeField(auto_now_add=True)
-    updated_at       = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table  = "listings"
-        ordering  = ["-created_at"]
-        verbose_name = "Listing"
+        db_table         = "listings"
+        ordering         = ["-created_at"]
+        verbose_name     = "Listing"
         verbose_name_plural = "Listings"
 
     def __str__(self):
@@ -102,7 +114,10 @@ class Listing(models.Model):
     @property
     def is_available(self):
         """Check if seats are available."""
-        return self.available_seats > 0 and self.status == self.Status.ACTIVE
+        return (
+            self.available_seats > 0
+            and self.status == self.Status.ACTIVE
+        )
 
     @property
     def seats_booked(self):

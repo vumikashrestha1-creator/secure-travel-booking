@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Listing
 
 
+# ── Full Listing Serializer (Admin/Agent) ─────────────────────────
 class ListingSerializer(serializers.ModelSerializer):
     """Full listing details — used for create/update by admin/agent."""
     discounted_price = serializers.ReadOnlyField()
@@ -18,7 +19,8 @@ class ListingSerializer(serializers.ModelSerializer):
             "available_seats", "max_seats", "seats_booked",
             "start_date", "end_date", "duration_days",
             "includes_hotel", "includes_flight", "includes_meals",
-            "image", "rating", "is_available",
+            "image", "image_url",
+            "rating", "is_available",
             "created_by", "created_by_name", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_by", "created_at", "updated_at"]
@@ -47,6 +49,7 @@ class ListingSerializer(serializers.ModelSerializer):
         return attrs
 
 
+# ── Compact Listing Serializer (Public Browse) ────────────────────
 class ListingListSerializer(serializers.ModelSerializer):
     """Compact listing — used for browse/search results."""
     discounted_price = serializers.ReadOnlyField()
@@ -60,5 +63,6 @@ class ListingListSerializer(serializers.ModelSerializer):
             "price_per_person", "discount_percent", "discounted_price",
             "available_seats", "start_date", "end_date",
             "duration_days", "includes_hotel", "includes_flight",
-            "includes_meals", "image", "rating", "is_available",
+            "includes_meals", "image", "image_url",
+            "rating", "is_available",
         ]
