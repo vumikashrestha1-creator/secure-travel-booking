@@ -2,8 +2,7 @@ from rest_framework              import status, generics, filters
 from rest_framework.response     import Response
 from rest_framework.views        import APIView
 from rest_framework.permissions  import IsAuthenticated, AllowAny
-
-from django.db.models import Q
+from django.db.models            import Q
 
 from .models       import Listing
 from .serializers  import ListingSerializer, ListingListSerializer
@@ -13,8 +12,19 @@ from apps.users.permissions import IsAdminOrTravelAgent
 # ── Public: Browse All Listings ───────────────────────────────────
 class ListingListView(generics.ListAPIView):
     """
-    Anyone can browse listings (no login required).
-    Supports search and filtering via query parameters.
+    Anyone can browse listings.
+    Supports advanced search, filtering and sorting.
+
+    Query parameters:
+    - search        → search title, description, destination
+    - type          → PACKAGE / HOTEL / FLIGHT
+    - min_price     → minimum price per person
+    - max_price     → maximum price per person
+    - min_rating    → minimum average rating
+    - available     → true = only show listings with seats
+    - start_date    → listings starting on or after this date
+    - duration      → maximum duration in days
+    - sort          → cheapest / expensive / rating / duration / seats
     """
     permission_classes = [AllowAny]
     serializer_class   = ListingListSerializer
@@ -22,40 +32,81 @@ class ListingListView(generics.ListAPIView):
     def get_queryset(self):
         queryset = Listing.objects.filter(status="ACTIVE")
 
-        # ── Filters from query params ──────────────────────────────
-        listing_type = self.request.query_params.get("type")
-        destination  = self.request.query_params.get("destination")
-        country      = self.request.query_params.get("country")
-        min_price    = self.request.query_params.get("min_price")
-        max_price    = self.request.query_params.get("max_price")
-        start_date   = self.request.query_params.get("start_date")
-        search       = self.request.query_params.get("search")
-        available    = self.request.query_params.get("available")
-
-        if listing_type:
-            queryset = queryset.filter(listing_type=listing_type.upper())
-        if destination:
-            queryset = queryset.filter(destination__icontains=destination)
-        if country:
-            queryset = queryset.filter(country__icontains=country)
-        if min_price:
-            queryset = queryset.filter(price_per_person__gte=min_price)
-        if max_price:
-            queryset = queryset.filter(price_per_person__lte=max_price)
-        if start_date:
-            queryset = queryset.filter(start_date__gte=start_date)
-        if available == "true":
-            queryset = queryset.filter(available_seats__gt=0)
-
-        # ── Search across multiple fields ──────────────────────────
+        # ── Search ────────────────────────────────────────────────
+        search = self.request.query_params.get("search")
         if search:
             queryset = queryset.filter(
                 Q(title__icontains=search)       |
                 Q(description__icontains=search) |
                 Q(destination__icontains=search) |
                 Q(country__icontains=search)     |
-                Q(city__icontains=search)
+                Q(city__icontains=search)        |
+                Q(origin__icontains=search)
             )
+
+        # ── Type filter ───────────────────────────────────────────
+        listing_type = self.request.query_params.get("type")
+        if listing_type and listing_type != "ALL":
+            queryset = queryset.filter(
+                listing_type=listing_type.upper()
+            )
+
+        # ── Price filter ──────────────────────────────────────────
+        min_price = self.request.query_params.get("min_price")
+        max_price = self.request.query_params.get("max_price")
+        if min_price:
+            queryset = queryset.filter(
+                price_per_person__gte=min_price
+            )
+        if max_price:
+            queryset = queryset.filter(
+                price_per_person__lte=max_price
+            )
+
+        # ── Rating filter ─────────────────────────────────────────
+        min_rating = self.request.query_params.get("min_rating")
+        if min_rating:
+            queryset = queryset.filter(rating__gte=min_rating)
+
+        # ── Availability filter ───────────────────────────────────
+        available = self.request.query_params.get("available")
+        if available == "true":
+            queryset = queryset.filter(available_seats__gt=0)
+
+        # ── Date filter ───────────────────────────────────────────
+        start_date = self.request.query_params.get("start_date")
+        if start_date:
+            queryset = queryset.filter(start_date__gte=start_date)
+
+        # ── Duration filter ───────────────────────────────────────
+        max_duration = self.request.query_params.get("duration")
+        if max_duration:
+            queryset = queryset.filter(
+                duration_days__lte=max_duration
+            )
+
+        # ── Country filter ────────────────────────────────────────
+        country = self.request.query_params.get("country")
+        if country:
+            queryset = queryset.filter(country__icontains=country)
+
+        # ── Sorting ───────────────────────────────────────────────
+        sort = self.request.query_params.get("sort", "newest")
+
+        if sort == "cheapest":
+            queryset = queryset.order_by("price_per_person")
+        elif sort == "expensive":
+            queryset = queryset.order_by("-price_per_person")
+        elif sort == "rating":
+            queryset = queryset.order_by("-rating")
+        elif sort == "duration":
+            queryset = queryset.order_by("duration_days")
+        elif sort == "seats":
+            queryset = queryset.order_by("-available_seats")
+        elif sort == "discount":
+            queryset = queryset.order_by("-discount_percent")
+        else:
+            queryset = queryset.order_by("-created_at")
 
         return queryset
 
@@ -91,7 +142,10 @@ class ListingCreateView(APIView):
                 },
                 status=status.HTTP_201_CREATED,
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 # ── Admin/Agent: Update + Delete Listing ──────────────────────────
@@ -111,13 +165,21 @@ class ListingManageView(APIView):
                 {"error": "Listing not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        serializer = ListingSerializer(listing, data=request.data, partial=True)
+        serializer = ListingSerializer(
+            listing, data=request.data, partial=True
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(
-                {"message": "Listing updated.", "listing": serializer.data}
+                {
+                    "message": "Listing updated.",
+                    "listing": serializer.data
+                }
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     def delete(self, request, pk):
         listing = self.get_object(pk)
@@ -126,7 +188,6 @@ class ListingManageView(APIView):
                 {"error": "Listing not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        # Soft delete — just mark inactive
         listing.status = Listing.Status.INACTIVE
         listing.save()
         return Response(
