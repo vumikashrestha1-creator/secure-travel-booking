@@ -194,3 +194,36 @@ class ListingManageView(APIView):
             {"message": "Listing deactivated successfully."},
             status=status.HTTP_200_OK,
         )
+    
+    # ── Public: Real Time Availability ───────────────────────────────
+class ListingAvailabilityView(APIView):
+    """
+    Returns real time seat availability for a listing.
+    Frontend uses this to show progress bar and urgency messages.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
+        try:
+            listing = Listing.objects.get(pk=pk)
+        except Listing.DoesNotExist:
+            return Response(
+                {"error": "Listing not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        seats_booked   = listing.max_seats - listing.available_seats
+        percent_booked = round(
+            (seats_booked / listing.max_seats) * 100
+        ) if listing.max_seats > 0 else 0
+
+        return Response({
+            "listing_id":      listing.id,
+            "title":           listing.title,
+            "available_seats": listing.available_seats,
+            "max_seats":       listing.max_seats,
+            "seats_booked":    seats_booked,
+            "status":          listing.status,
+            "is_available":    listing.is_available,
+            "percent_booked":  percent_booked,
+        })
