@@ -57,7 +57,6 @@ class UserLoginSerializer(serializers.Serializer):
         email    = attrs.get("email", "").lower().strip()
         password = attrs.get("password", "")
 
-        # Check user exists
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
@@ -65,19 +64,16 @@ class UserLoginSerializer(serializers.Serializer):
                 "No account found with this email address."
             )
 
-        # Check account is active
         if not user.is_active:
             raise serializers.ValidationError(
                 "This account has been deactivated."
             )
 
-        # Check account is not locked
         if user.is_locked:
             raise serializers.ValidationError(
                 "Account is temporarily locked. Please try again later."
             )
 
-        # Check password
         if not user.check_password(password):
             user.failed_login_attempts += 1
             if user.failed_login_attempts >= 5:
@@ -92,7 +88,6 @@ class UserLoginSerializer(serializers.Serializer):
                 "Incorrect password. Please try again."
             )
 
-        # Reset failed attempts on success
         if user.failed_login_attempts > 0:
             user.failed_login_attempts = 0
             user.locked_until          = None
@@ -122,6 +117,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "mfa_type",
             "totp_confirmed",
             "date_joined",
+            "phone_number",
+            "address",
+            "city",
+            "country",
         ]
         read_only_fields = [
             "id",
