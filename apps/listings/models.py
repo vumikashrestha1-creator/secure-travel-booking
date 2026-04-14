@@ -74,6 +74,23 @@ class Listing(models.Model):
         help_text="Direct URL to listing image — paste any photo link here"
     )
 
+# ── External Booking URLs ─────────────────────────────────────
+    booking_com_url  = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="Paste exact Booking.com URL for this listing"
+    )
+    agoda_url        = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="Paste exact Agoda URL for this listing"
+    )
+    skyscanner_url   = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="Paste exact Skyscanner URL for this flight"
+    )
+    expedia_url      = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="Paste exact Expedia URL for this listing"
+    )
     # ── Rating ────────────────────────────────────────────────────
     rating = models.DecimalField(
         max_digits=3, decimal_places=1,
