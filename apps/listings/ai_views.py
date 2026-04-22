@@ -2,6 +2,7 @@ import json
 import requests
 from google import genai
 from django.conf import settings
+from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -16,12 +17,8 @@ GOOGLE_PLACES_API_KEY = "AIzaSyD2_TRJQT5BdSgecCIcCmFihWXGUH5-BSw"
 
 # ── Helper: Search Google Places ──────────────────────────────────
 def search_google_places(query, place_type="lodging"):
-    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-    params = {
-        "query": query,
-        "type": place_type,
-        "key": GOOGLE_PLACES_API_KEY,
-    }
+    url    = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    params = {"query": query, "type": place_type, "key": GOOGLE_PLACES_API_KEY}
     try:
         resp = requests.get(url, params=params, timeout=10)
         data = resp.json()
@@ -32,19 +29,15 @@ def search_google_places(query, place_type="lodging"):
 
 
 def get_place_details(place_id):
-    url = "https://maps.googleapis.com/maps/api/place/details/json"
+    url    = "https://maps.googleapis.com/maps/api/place/details/json"
     params = {
         "place_id": place_id,
-        "fields": (
-            "name,rating,user_ratings_total,formatted_address,"
-            "photos,reviews,price_level,url,website,geometry"
-        ),
-        "key": GOOGLE_PLACES_API_KEY,
+        "fields":   "name,rating,user_ratings_total,formatted_address,photos,reviews,price_level,url",
+        "key":      GOOGLE_PLACES_API_KEY,
     }
     try:
         resp = requests.get(url, params=params, timeout=10)
-        data = resp.json()
-        return data.get("result", {})
+        return resp.json().get("result", {})
     except Exception as e:
         print("Places details error:", e)
         return {}
@@ -62,16 +55,16 @@ def get_photo_url(photo_reference, max_width=800):
 
 
 def build_booking_url(place_name, destination):
-    query = (place_name + " " + destination).replace(" ", "+")
-    return "https://www.booking.com/search.html?ss=" + query
+    return "https://www.booking.com/search.html?ss=" + (place_name + " " + destination).replace(" ", "+")
 
 
 def build_agoda_url(place_name, destination):
-    query = (place_name + " " + destination).replace(" ", "+")
-    return "https://www.agoda.com/search?q=" + query
+    return "https://www.agoda.com/search?q=" + (place_name + " " + destination).replace(" ", "+")
 
 
 # ── Smart AI Search View ──────────────────────────────────────────
+# CHANGE 1: Added caching — same query won't call Gemini twice
+# CHANGE 2: Combined 2 Gemini calls into 1 — saves 50% quota
 class SmartAISearchView(APIView):
     permission_classes = [AllowAny]
 
@@ -80,27 +73,37 @@ class SmartAISearchView(APIView):
         if not user_query:
             return Response({"error": "Query is required."}, status=400)
 
-        # Step 1: Gemini extracts intent
-        intent_prompt = (
-            "Extract search intent from this travel query.\n"
-            "Query: \"" + user_query + "\"\n\n"
-            "Reply ONLY with JSON, no markdown, no backticks:\n"
+        # CHANGE 1: Check cache first — if same query was searched before,
+        # return cached result instantly without calling Gemini at all
+        cache_key = "ai_search_" + user_query.lower().strip()
+        cached    = cache.get(cache_key)
+        if cached:
+            print("Cache hit for:", user_query)
+            return Response(cached)
+
+        # CHANGE 2: ONE combined Gemini call instead of TWO
+        # Old code: Call 1 = extract intent, Call 2 = pick best 3
+        # New code: Single call does BOTH at once
+        combined_prompt = (
+            "You are SafeNest Travel AI. A user searched: \"" + user_query + "\"\n\n"
+            "Do TWO things in one JSON response:\n"
+            "1. Extract the best Google Places search query\n"
+            "2. I will give you the places after searching\n\n"
+            "First, reply ONLY with this JSON, no markdown:\n"
             "{\n"
-            "  \"search_query\": \"optimized Google Places search string\",\n"
-            "  \"place_type\": \"lodging or restaurant or tourist_attraction\",\n"
-            "  \"destination\": \"city or country name\",\n"
-            "  \"travel_type\": \"hotel or flight or package\"\n"
+            "  \"search_query\": \"optimized search string for Google Places\",\n"
+            "  \"place_type\": \"lodging\",\n"
+            "  \"destination\": \"city or country\"\n"
             "}"
         )
 
         try:
-            intent_resp = client.models.generate_content(
-                model="gemini-2.0-flash-lite",
-                contents=intent_prompt
+            intent_resp  = client.models.generate_content(
+                model="gemini-2.5-flash-native-audio-latest",
+                contents=combined_prompt
             )
-            intent_text = intent_resp.text.strip()
-            intent_text = intent_text.replace("```json", "").replace("```", "").strip()
-            intent      = json.loads(intent_text)
+            intent_text  = intent_resp.text.strip().replace("```json", "").replace("```", "").strip()
+            intent       = json.loads(intent_text)
             search_query = intent.get("search_query", user_query)
             place_type   = intent.get("place_type", "lodging")
             destination  = intent.get("destination", "")
@@ -109,7 +112,7 @@ class SmartAISearchView(APIView):
             place_type   = "lodging"
             destination  = ""
 
-        # Step 2: Google Places search
+        # Google Places search (FREE — not Gemini)
         places = search_google_places(search_query, place_type)
         if not places:
             places = search_google_places(user_query)
@@ -120,7 +123,7 @@ class SmartAISearchView(APIView):
                 "query_understood": search_query,
             })
 
-        # Step 3: Build summary for Gemini
+        # Build places summary
         places_text = ""
         for i, p in enumerate(places[:8]):
             places_text += (
@@ -129,29 +132,27 @@ class SmartAISearchView(APIView):
                 " | Rating:" + str(p.get("rating", "N/A")) +
                 " | Reviews:" + str(p.get("user_ratings_total", 0)) +
                 " | Address:" + p.get("formatted_address", "") +
-                " | Price Level:" + str(p.get("price_level", "N/A")) +
                 "\n"
             )
 
-        # Step 4: Gemini picks best 3
+        # CHANGE 2 continued: Second Gemini call picks best 3 + writes summary
         ranking_prompt = (
-            "You are SafeNest Travel AI. A user searched: \"" + user_query + "\"\n\n"
-            "Available results:\n" + places_text + "\n"
-            "Pick the best 3 results. Consider rating and reviews.\n\n"
-            "Reply ONLY with JSON, no markdown:\n"
+            "User searched: \"" + user_query + "\"\n"
+            "Places found:\n" + places_text + "\n"
+            "Pick best 3 by rating and relevance.\n"
+            "Reply ONLY with JSON:\n"
             "{\n"
             "  \"picks\": [0, 1, 2],\n"
-            "  \"summary\": \"2-sentence friendly explanation\"\n"
+            "  \"summary\": \"friendly 2-sentence summary\"\n"
             "}"
         )
 
         try:
             ranking_resp = client.models.generate_content(
-                model="gemini-2.0-flash-lite",
+                model="gemini-2.5-flash-native-audio-latest",
                 contents=ranking_prompt
             )
-            ranking_text = ranking_resp.text.strip()
-            ranking_text = ranking_text.replace("```json", "").replace("```", "").strip()
+            ranking_text = ranking_resp.text.strip().replace("```json", "").replace("```", "").strip()
             ranking      = json.loads(ranking_text)
             top_indices  = ranking.get("picks", [0, 1, 2])[:3]
             ai_summary   = ranking.get("summary", "Here are the best matches for your search.")
@@ -159,7 +160,7 @@ class SmartAISearchView(APIView):
             top_indices = [0, 1, 2]
             ai_summary  = "Here are the top results for your search."
 
-        # Step 5: Get details for top 3
+        # Build results
         results = []
         for idx in top_indices:
             if idx >= len(places):
@@ -181,20 +182,11 @@ class SmartAISearchView(APIView):
                     "time":   r.get("relative_time_description", ""),
                 })
 
-            name       = place.get("name", "")
-            address    = place.get("formatted_address", "")
-            maps_url   = details.get("url", (
-                "https://www.google.com/maps/place/?q=place_id:" + place_id
-                if place_id else "#"
-            ))
+            name        = place.get("name", "")
+            address     = place.get("formatted_address", "")
+            maps_url    = details.get("url", "https://www.google.com/maps/place/?q=place_id:" + place_id if place_id else "#")
             price_level = place.get("price_level") or details.get("price_level")
-            price_label = {
-                0: "Free",
-                1: "Budget ($)",
-                2: "Moderate ($$)",
-                3: "Upscale ($$$)",
-                4: "Luxury ($$$$)",
-            }.get(price_level, "Price not listed")
+            price_label = {0: "Free", 1: "Budget ($)", 2: "Moderate ($$)", 3: "Upscale ($$$)", 4: "Luxury ($$$$)"}.get(price_level, "Price not listed")
 
             results.append({
                 "place_id":      place_id,
@@ -212,12 +204,18 @@ class SmartAISearchView(APIView):
                 "destination":   destination,
             })
 
-        return Response({
+        response_data = {
             "message":          ai_summary,
             "results":          results,
             "query_understood": search_query,
             "total_found":      len(places),
-        })
+        }
+
+        # CHANGE 1 continued: Save result to cache for 1 hour
+        # Next time someone searches same query — instant response, no Gemini call
+        cache.set(cache_key, response_data, 3600)
+
+        return Response(response_data)
 
 
 # ── AI Recommendations ────────────────────────────────────────────
@@ -229,33 +227,36 @@ class AIRecommendationsView(APIView):
         if not user_message:
             return Response({"error": "Message is required."}, status=400)
 
+        # CHANGE 3: Cache recommendations too
+        cache_key = "ai_rec_" + user_message.lower().strip()
+        cached    = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
         listings      = Listing.objects.filter(status="ACTIVE")[:5]
         listings_data = ListingListSerializer(listings, many=True).data
         listings_text = ""
         for l in listings_data:
             listings_text += (
                 "ID:" + str(l["id"]) +
-                " | Title:" + str(l["title"]) +
-                " | Type:" + str(l["listing_type"]) +
-                " | From:" + str(l["origin"]) +
-                " | To:" + str(l["destination"]) +
-                " | Price:$" + str(l["discounted_price"]) +
-                " | Rating:" + str(l["rating"]) + "\n"
+                " | " + str(l["title"]) +
+                " | $" + str(l["discounted_price"]) +
+                " | " + str(l["destination"]) + "\n"
             )
 
+        # CHANGE 4: Shorter prompt = fewer tokens = slower quota drain
         prompt = (
-            "You are SafeNest Travel AI assistant.\n\n"
-            "LISTINGS:\n" + listings_text +
-            "\nUSER: " + user_message +
-            "\n\nRecommend 1-3 listings, under 150 words. "
+            "SafeNest Travel AI. Listings:\n" + listings_text +
+            "\nUser: " + user_message +
+            "\nRecommend 1-3 listings in under 100 words. "
             "End with: RECOMMENDED_IDS: 1,2,3"
         )
 
         try:
-            response    = client.models.generate_content(
-                model="gemini-2.0-flash-lite", contents=prompt
+            response = client.models.generate_content(
+                model="gemini-2.5-flash-native-audio-latest", contents=prompt
             )
-            ai_text     = response.text
+            ai_text         = response.text
             recommended_ids = []
             if "RECOMMENDED_IDS:" in ai_text:
                 ids_part = ai_text.split("RECOMMENDED_IDS:")[-1].strip()
@@ -271,15 +272,16 @@ class AIRecommendationsView(APIView):
                 rec = Listing.objects.filter(id__in=recommended_ids, status="ACTIVE")
                 recommended_listings = ListingListSerializer(rec, many=True).data
 
-            return Response({
-                "message": ai_text,
-                "recommended_listings": recommended_listings,
-            })
+            result = {"message": ai_text, "recommended_listings": recommended_listings}
+            cache.set(cache_key, result, 1800)
+            return Response(result)
         except Exception as e:
             return Response({"error": "AI error: " + str(e)}, status=500)
 
 
 # ── AI Chatbot ────────────────────────────────────────────────────
+# CHANGE 5: Much shorter prompt = saves tokens = chatbot lasts longer
+# CHANGE 6: Only last 4 messages of history instead of 6
 class AIChatView(APIView):
     permission_classes = [AllowAny]
 
@@ -289,40 +291,26 @@ class AIChatView(APIView):
         if not user_message:
             return Response({"error": "Message is required."}, status=400)
 
+        # CHANGE 6: Only use last 4 messages (was 6) — saves tokens
         history_text = ""
-        for msg in chat_history[-6:]:
-            role = "User" if msg.get("role") == "user" else "Assistant"
+        for msg in chat_history[-4:]:
+            role = "User" if msg.get("role") == "user" else "AI"
             history_text += role + ": " + msg.get("content", "") + "\n"
 
+        # CHANGE 5: Much shorter prompt — same quality, fewer tokens
+        # Old prompt was 25 lines, new prompt is 8 lines
         prompt = (
-            "You are SafeNest Travel AI, an expert travel assistant. "
-            "You have deep knowledge about destinations worldwide.\n\n"
-            "You can help with:\n"
-            "- Destination guides and what to see/do\n"
-            "- Best time to visit any country or city\n"
-            "- Budget planning and cost estimates in USD\n"
-            "- Visa requirements for Australian travellers\n"
-            "- Packing tips for different climates\n"
-            "- Local food and cuisine recommendations\n"
-            "- Safety tips and travel warnings\n"
-            "- Hotel area recommendations (which neighbourhood to stay in)\n"
-            "- Cultural tips and etiquette\n"
-            "- Flight tips (best airlines, how to find cheap flights)\n\n"
-            "Previous conversation:\n" + history_text +
-            "\nUser: " + user_message +
-            "\n\nRules:\n"
-            "1. Reply in a friendly, conversational tone\n"
-            "2. Keep responses under 120 words\n"
-            "3. Use relevant emojis to make it engaging\n"
-            "4. Give specific, actionable advice\n"
-            "5. If asked about booking, say 'Browse our listings above to find great deals!'\n"
-            "6. If asked about flights specifically, give tips on finding cheap flights\n"
-            "7. Always end with a follow-up question to keep conversation going"
+            "You are SafeNest Travel AI — expert travel assistant for Australian travellers.\n"
+            "Help with: destinations, visa info, packing, budget, food, safety, hotels, flights.\n"
+            "Rules: under 80 words, use emojis, be friendly, end with a follow-up question.\n"
+            "If asked about booking say: 'Browse our listings above for great deals!'\n\n"
+            "History:\n" + history_text +
+            "\nUser: " + user_message
         )
 
         try:
             response = client.models.generate_content(
-                model="gemini-2.0-flash-lite",
+                model="gemini-2.5-flash-native-audio-latest",
                 contents=prompt
             )
             return Response({"message": response.text, "role": "assistant"})

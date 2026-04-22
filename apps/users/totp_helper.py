@@ -44,7 +44,6 @@ def generate_qr_code_base64(uri):
     )
     qr.add_data(uri)
     qr.make(fit=True)
-
     img = qr.make_image(
         fill_color = "black",
         back_color = "white"
