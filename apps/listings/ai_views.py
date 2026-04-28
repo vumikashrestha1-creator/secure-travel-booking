@@ -99,7 +99,7 @@ class SmartAISearchView(APIView):
 
         try:
             intent_resp  = client.models.generate_content(
-                model="gemini-2.5-flash-native-audio-latest",
+                model="gemini-flash-latest",
                 contents=combined_prompt
             )
             intent_text  = intent_resp.text.strip().replace("```json", "").replace("```", "").strip()
@@ -149,7 +149,7 @@ class SmartAISearchView(APIView):
 
         try:
             ranking_resp = client.models.generate_content(
-                model="gemini-2.5-flash-native-audio-latest",
+                model="gemini-flash-latest",
                 contents=ranking_prompt
             )
             ranking_text = ranking_resp.text.strip().replace("```json", "").replace("```", "").strip()
@@ -254,7 +254,7 @@ class AIRecommendationsView(APIView):
 
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-flash-native-audio-latest", contents=prompt
+                model="gemini-flash-latest", contents=prompt
             )
             ai_text         = response.text
             recommended_ids = []
@@ -310,9 +310,76 @@ class AIChatView(APIView):
 
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-flash-native-audio-latest",
+                model="gemini-flash-latest",
                 contents=prompt
             )
             return Response({"message": response.text, "role": "assistant"})
         except Exception as e:
             return Response({"error": "AI error: " + str(e)}, status=500)
+        
+
+class ListingAutofillView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        destination  = request.data.get("destination", "").strip()
+        listing_type = request.data.get("listing_type", "PACKAGE").strip()
+
+        if not destination:
+            return Response({"error": "Destination is required."}, status=400)
+
+        # Get today's date to suggest realistic future dates
+        from datetime import date, timedelta
+        today      = date.today()
+        start_date = today + timedelta(days=30)  # Start 30 days from today
+
+        prompt = (
+            "You are a travel listing assistant for SafeNest Travel.\n"
+            "Generate listing details for a " + listing_type + " to " + destination + ".\n"
+            "Today's date is " + str(today) + ".\n\n"
+            "Reply ONLY with JSON, no markdown, no backticks:\n"
+            "{\n"
+            "  \"title\": \"catchy listing title including destination\",\n"
+            "  \"description\": \"2-3 sentence engaging description\",\n"
+            "  \"country\": \"country name\",\n"
+            "  \"city\": \"main city name\",\n"
+            "  \"origin\": \"Sydney\",\n"
+            "  \"duration_days\": 7,\n"
+            "  \"price_per_person\": 1200,\n"
+            "  \"max_seats\": 20,\n"
+            "  \"includes_hotel\": true,\n"
+            "  \"includes_flight\": true,\n"
+            "  \"includes_meals\": false,\n"
+            "  \"image_url\": \"https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800\"\n"
+            "}\n\n"
+            "Rules:\n"
+            "- Price realistic in USD for Australian traveller\n"
+            "- For HOTEL: max_seats=30, includes_hotel=true, includes_flight=false\n"
+            "- For FLIGHT: max_seats=150, includes_flight=true, includes_hotel=false\n"
+            "- For PACKAGE: max_seats=20, includes_hotel=true, includes_flight=true\n"
+            "- duration_days should be realistic for the destination from Australia\n"
+            "- Use a real Unsplash photo URL for the destination"
+        )
+
+        try:
+            response = client.models.generate_content(
+                model="gemini-flash-latest",
+                contents=prompt
+            )
+            text = response.text.strip().replace("```json", "").replace("```", "").strip()
+            data = json.loads(text)
+
+            # Calculate dates based on duration Gemini suggested
+            duration   = int(data.get("duration_days", 7))
+            end_date   = start_date + timedelta(days=duration)
+            max_seats  = int(data.get("max_seats", 20))
+
+            # Add dates and seats to the response
+            data["start_date"]      = str(start_date)
+            data["end_date"]        = str(end_date)
+            data["max_seats"]       = max_seats
+            data["available_seats"] = max_seats  # All seats available for new listing
+
+            return Response(data)
+        except Exception as e:
+            return Response({"error": "Autofill failed: " + str(e)}, status=500)
