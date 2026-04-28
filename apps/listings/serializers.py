@@ -24,7 +24,7 @@ class ListingSerializer(serializers.ModelSerializer):
             "created_by", "created_by_name", "created_at", "updated_at",
 
             # ── External Booking URLs ─────────────────────────────
-            "booking_com_url", "agoda_url", "skyscanner_url", "expedia_url",
+            "booking_com_url", "agoda_url", "skyscanner_url", "expedia_url", "booking_com_price", "agoda_price", "expedia_price", "skyscanner_price",
             "rating", "is_available",
             "created_by", "created_by_name", "created_at", "updated_at",
         ]
@@ -72,6 +72,6 @@ class ListingListSerializer(serializers.ModelSerializer):
             "rating", "is_available",
 
               # ── External Booking URLs ─────────────────────────────
-            "booking_com_url", "agoda_url", "skyscanner_url", "expedia_url",
+            "booking_com_url", "agoda_url", "skyscanner_url", "expedia_url", "booking_com_price", "agoda_price", "expedia_price", "skyscanner_price",
             "rating", "is_available",
         ]

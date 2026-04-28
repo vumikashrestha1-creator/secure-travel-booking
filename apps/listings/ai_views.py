@@ -328,10 +328,9 @@ class ListingAutofillView(APIView):
         if not destination:
             return Response({"error": "Destination is required."}, status=400)
 
-        # Get today's date to suggest realistic future dates
         from datetime import date, timedelta
         today      = date.today()
-        start_date = today + timedelta(days=30)  # Start 30 days from today
+        start_date = today + timedelta(days=30)
 
         prompt = (
             "You are a travel listing assistant for SafeNest Travel.\n"
@@ -350,14 +349,24 @@ class ListingAutofillView(APIView):
             "  \"includes_hotel\": true,\n"
             "  \"includes_flight\": true,\n"
             "  \"includes_meals\": false,\n"
-            "  \"image_url\": \"https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800\"\n"
+            "  \"image_url\": \"https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800\",\n"
+            "  \"booking_com_price\": 1450,\n"
+            "  \"agoda_price\": 1380,\n"
+            "  \"expedia_price\": 1500,\n"
+            "  \"skyscanner_price\": 1320\n"
             "}\n\n"
             "Rules:\n"
-            "- Price realistic in USD for Australian traveller\n"
-            "- For HOTEL: max_seats=30, includes_hotel=true, includes_flight=false\n"
-            "- For FLIGHT: max_seats=150, includes_flight=true, includes_hotel=false\n"
-            "- For PACKAGE: max_seats=20, includes_hotel=true, includes_flight=true\n"
-            "- duration_days should be realistic for the destination from Australia\n"
+            "- price_per_person is the SafeNest price — make it the CHEAPEST option\n"
+            "- booking_com_price, agoda_price, expedia_price, skyscanner_price should all be\n"
+            "  HIGHER than price_per_person by 10 to 30 percent to show SafeNest is best value\n"
+            "- For HOTEL: max_seats=30, includes_hotel=true, includes_flight=false,\n"
+            "  only fill booking_com_price and agoda_price, set expedia_price and skyscanner_price to null\n"
+            "- For FLIGHT: max_seats=150, includes_flight=true, includes_hotel=false,\n"
+            "  only fill skyscanner_price and booking_com_price, set agoda_price and expedia_price to null\n"
+            "- For PACKAGE: max_seats=20, includes_hotel=true, includes_flight=true,\n"
+            "  fill all 4 competitor prices\n"
+            "- All prices in USD, realistic for Australian traveller\n"
+            "- duration_days realistic for the destination from Australia\n"
             "- Use a real Unsplash photo URL for the destination"
         )
 
@@ -369,16 +378,15 @@ class ListingAutofillView(APIView):
             text = response.text.strip().replace("```json", "").replace("```", "").strip()
             data = json.loads(text)
 
-            # Calculate dates based on duration Gemini suggested
-            duration   = int(data.get("duration_days", 7))
-            end_date   = start_date + timedelta(days=duration)
-            max_seats  = int(data.get("max_seats", 20))
+            # Calculate dates
+            duration  = int(data.get("duration_days", 7))
+            end_date  = start_date + timedelta(days=duration)
+            max_seats = int(data.get("max_seats", 20))
 
-            # Add dates and seats to the response
             data["start_date"]      = str(start_date)
             data["end_date"]        = str(end_date)
             data["max_seats"]       = max_seats
-            data["available_seats"] = max_seats  # All seats available for new listing
+            data["available_seats"] = max_seats
 
             return Response(data)
         except Exception as e:

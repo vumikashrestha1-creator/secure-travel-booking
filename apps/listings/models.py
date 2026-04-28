@@ -91,6 +91,29 @@ class Listing(models.Model):
         max_length=500, blank=True, null=True,
         help_text="Paste exact Expedia URL for this listing"
     )
+
+# ── External Platform Prices (for comparison table) ──────────
+    booking_com_price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        blank=True, null=True,
+        help_text="Price shown on Booking.com (for comparison)"
+    )
+    agoda_price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        blank=True, null=True,
+        help_text="Price shown on Agoda (for comparison)"
+    )
+    expedia_price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        blank=True, null=True,
+        help_text="Price shown on Expedia (for comparison)"
+    )
+    skyscanner_price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        blank=True, null=True,
+        help_text="Price shown on Skyscanner (for comparison)"
+    )
+
     # ── Rating ────────────────────────────────────────────────────
     rating = models.DecimalField(
         max_digits=3, decimal_places=1,
