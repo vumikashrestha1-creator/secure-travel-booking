@@ -10,8 +10,8 @@ from .serializers  import (
     BookingSerializer,
     UpdateBookingStatusSerializer,
 )
-from apps.listings.models       import Listing
-from apps.users.permissions     import IsAdmin, IsAdminOrTravelAgent
+from apps.listings.models   import Listing
+from apps.users.permissions import IsAdmin, IsAdminOrTravelAgent, IsAdminOrTravelAgentOrManager
 
 
 # ── Customer: Create Booking ──────────────────────────────────────
@@ -22,7 +22,6 @@ class CreateBookingView(APIView):
         listing_id       = request.data.get("listing")
         number_of_guests = int(request.data.get("number_of_guests", 1))
 
-        # ── Get listing ───────────────────────────────────────────
         try:
             listing = Listing.objects.get(pk=listing_id)
         except Listing.DoesNotExist:
@@ -31,7 +30,6 @@ class CreateBookingView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # ── Real time availability checks ─────────────────────────
         if listing.status != "ACTIVE":
             return Response(
                 {"error": "This listing is no longer available."},
@@ -46,11 +44,7 @@ class CreateBookingView(APIView):
 
         if number_of_guests > listing.available_seats:
             return Response(
-                {
-                    "error": "Not enough seats. Only " +
-                    str(listing.available_seats) +
-                    " seats remaining."
-                },
+                {"error": "Not enough seats. Only " + str(listing.available_seats) + " seats remaining."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -60,7 +54,6 @@ class CreateBookingView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # ── Use serializer to create booking ──────────────────────
         serializer = CreateBookingSerializer(
             data=request.data,
             context={"request": request}
@@ -68,7 +61,6 @@ class CreateBookingView(APIView):
         if serializer.is_valid():
             booking = serializer.save()
 
-            # ── Reduce seats after booking ────────────────────────
             listing.available_seats -= number_of_guests
             if listing.available_seats <= 0:
                 listing.available_seats = 0
@@ -83,10 +75,7 @@ class CreateBookingView(APIView):
                 },
                 status=status.HTTP_201_CREATED,
             )
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ── Customer: My Booking History ──────────────────────────────────
@@ -101,9 +90,7 @@ class MyBookingsView(generics.ListAPIView):
 
         booking_status = self.request.query_params.get("status")
         if booking_status:
-            queryset = queryset.filter(
-                status=booking_status.upper()
-            )
+            queryset = queryset.filter(status=booking_status.upper())
         return queryset
 
 
@@ -116,9 +103,7 @@ class BookingDetailView(APIView):
             if request.user.role == "ADMIN":
                 booking = Booking.objects.get(pk=pk)
             else:
-                booking = Booking.objects.get(
-                    pk=pk, user=request.user
-                )
+                booking = Booking.objects.get(pk=pk, user=request.user)
         except Booking.DoesNotExist:
             return Response(
                 {"error": "Booking not found."},
@@ -134,9 +119,7 @@ class CancelBookingView(APIView):
 
     def post(self, request, pk):
         try:
-            booking = Booking.objects.get(
-                pk=pk, user=request.user
-            )
+            booking = Booking.objects.get(pk=pk, user=request.user)
         except Booking.DoesNotExist:
             return Response(
                 {"error": "Booking not found."},
@@ -155,7 +138,6 @@ class CancelBookingView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # ── Restore seats when cancelled ──────────────────────────
         listing = booking.listing
         listing.available_seats += booking.number_of_guests
         if listing.status == listing.Status.SOLDOUT:
@@ -173,34 +155,28 @@ class CancelBookingView(APIView):
 
 
 # ── Admin: All Bookings ───────────────────────────────────────────
+# Manager can VIEW bookings but cannot update them
 class AdminBookingListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated, IsAdminOrTravelAgent]
+    permission_classes = [IsAuthenticated, IsAdminOrTravelAgentOrManager]
     serializer_class   = BookingSerializer
 
     def get_queryset(self):
-        queryset = Booking.objects.all().select_related(
-            "listing", "user"
-        )
+        queryset = Booking.objects.all().select_related("listing", "user")
         booking_status = self.request.query_params.get("status")
         payment_status = self.request.query_params.get("payment_status")
         user_email     = self.request.query_params.get("email")
 
         if booking_status:
-            queryset = queryset.filter(
-                status=booking_status.upper()
-            )
+            queryset = queryset.filter(status=booking_status.upper())
         if payment_status:
-            queryset = queryset.filter(
-                payment_status=payment_status.upper()
-            )
+            queryset = queryset.filter(payment_status=payment_status.upper())
         if user_email:
-            queryset = queryset.filter(
-                user__email__icontains=user_email
-            )
+            queryset = queryset.filter(user__email__icontains=user_email)
         return queryset
 
 
 # ── Admin: Update Booking Status ──────────────────────────────────
+# Only Admin can update — Manager cannot
 class AdminUpdateBookingView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
@@ -217,13 +193,5 @@ class AdminUpdateBookingView(APIView):
         )
         if serializer.is_valid():
             serializer.save()
-            return Response(
-                {
-                    "message": "Booking updated.",
-                    "booking": serializer.data
-                }
-            )
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )
+            return Response({"message": "Booking updated.", "booking": serializer.data})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

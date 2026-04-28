@@ -46,6 +46,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         ADMIN        = "ADMIN",        "Administrator"
         CUSTOMER     = "CUSTOMER",     "Customer"
         TRAVEL_AGENT = "TRAVEL_AGENT", "Travel Agent"
+        MANAGER      = "MANAGER",      "Manager" 
 
     # ── Basic Info ────────────────────────────────────────────────
     email      = models.EmailField(unique=True, db_index=True)
