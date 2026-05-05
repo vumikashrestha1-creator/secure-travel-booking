@@ -9,6 +9,7 @@ urlpatterns = [
     path("<int:pk>/cancel/",     views.CancelBookingView.as_view(),    name="booking_cancel"),
 
     # Admin / Agent
+	path("admin/create-for-user/", views.AdminCreateBookingView.as_view(), name="admin_create_booking"),
     path("admin/all/",           views.AdminBookingListView.as_view(), name="admin_booking_list"),
     path("admin/<int:pk>/update/",views.AdminUpdateBookingView.as_view(), name="admin_booking_update"),
 ]

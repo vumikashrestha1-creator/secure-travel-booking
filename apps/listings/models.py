@@ -74,6 +74,46 @@ class Listing(models.Model):
         help_text="Direct URL to listing image — paste any photo link here"
     )
 
+# ── External Booking URLs ─────────────────────────────────────
+    booking_com_url  = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="Paste exact Booking.com URL for this listing"
+    )
+    agoda_url        = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="Paste exact Agoda URL for this listing"
+    )
+    skyscanner_url   = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="Paste exact Skyscanner URL for this flight"
+    )
+    expedia_url      = models.URLField(
+        max_length=500, blank=True, null=True,
+        help_text="Paste exact Expedia URL for this listing"
+    )
+
+# ── External Platform Prices (for comparison table) ──────────
+    booking_com_price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        blank=True, null=True,
+        help_text="Price shown on Booking.com (for comparison)"
+    )
+    agoda_price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        blank=True, null=True,
+        help_text="Price shown on Agoda (for comparison)"
+    )
+    expedia_price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        blank=True, null=True,
+        help_text="Price shown on Expedia (for comparison)"
+    )
+    skyscanner_price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        blank=True, null=True,
+        help_text="Price shown on Skyscanner (for comparison)"
+    )
+
     # ── Rating ────────────────────────────────────────────────────
     rating = models.DecimalField(
         max_digits=3, decimal_places=1,

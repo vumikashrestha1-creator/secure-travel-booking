@@ -13,6 +13,42 @@ class IsAdmin(BasePermission):
         )
 
 
+class IsManager(BasePermission):
+    """Allow access only to Manager users."""
+    message = "Access restricted to managers only."
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and request.user.role == "MANAGER"
+        )
+
+
+class IsAdminOrManager(BasePermission):
+    """Allow access to Admins and Managers."""
+    message = "Access restricted to administrators and managers."
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ["ADMIN", "MANAGER"]
+        )
+
+
+class IsAdminOrTravelAgentOrManager(BasePermission):
+    """Allow access to Admins, Travel Agents and Managers."""
+    message = "Access restricted."
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ["ADMIN", "TRAVEL_AGENT", "MANAGER"]
+        )
+
+
 class IsCustomer(BasePermission):
     """Allow access only to Customer users."""
     message = "Access restricted to customers only."
