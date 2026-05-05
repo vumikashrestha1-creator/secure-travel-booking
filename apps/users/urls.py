@@ -47,6 +47,7 @@ urlpatterns = [
          views.AdminResetPasswordView.as_view(),
          name="admin_reset_password"),
 
+
     path("admin/users/<int:pk>/disable-mfa/",
          views.AdminDisableMFAView.as_view(),
          name="admin_disable_mfa"),

@@ -498,6 +498,7 @@ class AdminResetPasswordView(APIView):
         return Response({"message": "Password reset successfully."})
 
 # ── Admin: Deactivate / Reactivate User ───────────────────────
+
 class AdminUserDeleteView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
