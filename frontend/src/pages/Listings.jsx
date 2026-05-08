@@ -1,3 +1,4 @@
+import LoadingSpinner from "../components/LoadingSpinner";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
@@ -316,18 +317,30 @@ const Listings = () => {
                         onClick={() => navigate("/listings/" + listing.id)}
                         className="cursor-pointer relative h-48 overflow-hidden group"
                       >
-                        {listing.image_url ? (
-                          <img
-                            src={listing.image_url}
-                            alt={listing.title}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                            onError={(e) => { e.target.style.display = "none"; }}
-                          />
-                        ) : (
-                          <div className="bg-gradient-to-br from-teal-400 to-teal-700 h-full w-full flex items-center justify-center">
-                            <span className="text-5xl">{typeIcon(listing.listing_type)}</span>
-                          </div>
-                        )}
+                        {(() => {
+  const dest = (listing.destination || "").toLowerCase();
+  const fallbacks = {
+    bali: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=400",
+    tokyo: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400",
+    sydney: "https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=400",
+    paris: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=400",
+    dubai: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400",
+    london: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400",
+    melbourne: "https://images.unsplash.com/photo-1514395462725-fb4566210144?w=400",
+    maldives: "https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=400",
+  };
+  const imgSrc = listing.image_url ||
+    Object.entries(fallbacks).find(([k]) => dest.includes(k))?.[1] ||
+    "https://images.unsplash.com/photo-1488085061387-422e29b40080?w=400";
+  return (
+    <img
+      src={imgSrc}
+      alt={listing.title}
+      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+      onError={(e) => { e.target.style.display = "none"; }}
+    />
+  );
+})()}
                         {/* Gradient overlay on hover */}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
