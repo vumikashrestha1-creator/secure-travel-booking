@@ -19,6 +19,7 @@ import DisableTOTP         from "./pages/DisableTOTP";
 import Profile             from "./pages/Profile";
 import AIChatbot from "./components/AIChatbot";
 import TravelAgentDashboard from "./pages/TravelAgentDashboard";
+import AboutUs from "./pages/AboutUs";
 
 function App() {
   return (
@@ -67,6 +68,7 @@ function App() {
             }/>
 
             {/* ── Default redirects ──────────────────────────── */}
+		<Route path="/about" element={<AboutUs />} />
             <Route path="/"  element={<Home />} />
             <Route path="*"  element={<Navigate to="/listings" replace />} />
 

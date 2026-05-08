@@ -39,6 +39,9 @@ const Navbar = () => {
             <Link to="/listings" className={linkClass("/listings")}>
               Browse Packages
             </Link>
+            <Link to="/about" className={linkClass("/about")}>
+              About Us
+            </Link>
 
             {isLoggedIn ? (
               <>
@@ -64,13 +67,11 @@ const Navbar = () => {
                     Manager
                   </Link>
                 )}
-                
                 {isTravelAgent && (
-                <Link to="/agent-dashboard" className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold hover:bg-blue-600 transition-colors">
-                  Agent
-                </Link>
-              )}
-                
+                  <Link to="/agent-dashboard" className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold hover:bg-blue-600 transition-colors">
+                    Agent
+                  </Link>
+                )}
                 <Link
                   to="/profile"
                   className="flex items-center gap-1.5 text-teal-200 hover:text-white text-sm transition-colors"
@@ -122,6 +123,13 @@ const Navbar = () => {
             className="block text-teal-200 hover:text-white text-sm font-medium py-2 border-b border-teal-800"
           >
             🌍 Browse Packages
+          </Link>
+          <Link
+            to="/about"
+            onClick={() => setMenuOpen(false)}
+            className="block text-teal-200 hover:text-white text-sm font-medium py-2 border-b border-teal-800"
+          >
+            ℹ️ About Us
           </Link>
 
           {isLoggedIn ? (
