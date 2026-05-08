@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider }    from "./context/AuthContext";
 import Navbar              from "./components/Navbar";
 import ProtectedRoute      from "./components/ProtectedRoute";
@@ -20,6 +20,7 @@ import AIChatbot           from "./components/AIChatbot";
 import TravelAgentDashboard from "./pages/TravelAgentDashboard";
 import AboutUs             from "./pages/AboutUs";
 import Contact             from "./pages/Contact";
+import NotFound            from "./pages/NotFound";
 
 function App() {
   return (
@@ -72,8 +73,8 @@ function App() {
             }/>
 
             {/* Default */}
-            <Route path="/"  element={<Home />} />
-            <Route path="*"  element={<Navigate to="/listings" replace />} />
+            <Route path="/" element={<Home />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
           <AIChatbot />
         </div>
