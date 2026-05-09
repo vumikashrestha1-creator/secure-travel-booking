@@ -168,7 +168,7 @@ class ChangePasswordSerializer(serializers.Serializer):
                 {
                     "new_password": (
                         "New password must be different "
-                        "from your current password."
+                        "from your current password." # nosec B105 - This message is not revealing any sensitive information, just a generic password policy reminder.
                     )
                 }
             )

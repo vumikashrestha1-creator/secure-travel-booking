@@ -1,0 +1,76 @@
+Run started:2026-05-09 02:49:23.018540+00:00
+
+Test results:
+>> Issue: [B308:blacklist] Use of mark_safe() may expose cross-site scripting vulnerabilities and should be reviewed.
+   Severity: Medium   Confidence: High
+   CWE: CWE-79 (https://cwe.mitre.org/data/definitions/79.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b308-mark-safe
+   Location: apps/listings\admin.py:347:44
+346	            from django.utils.safestring import mark_safe
+347	            context["autofill_html_safe"] = mark_safe(autofill_html)
+348	
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: apps/payments\services.py:25:32
+24	        chars = string.ascii_uppercase + string.digits
+25	        return "TXN-" + "".join(random.choices(chars, k=12))
+26	
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: apps/payments\services.py:103:18
+102	        # In real Stripe, success/failure comes from the bank
+103	        success = random.random() > 0.1
+104	        #success = True  # For testing, we can force success
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: apps/users\otp.py:11:19
+10	    """Generate a 6-digit numeric OTP code."""
+11	    return "".join(random.choices(string.digits, k=6))
+12	
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'New password must be different from your current password.'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html
+   Location: apps/users\serializers.py:169:20
+168	                {
+169	                    "new_password": (
+170	                        "New password must be different "
+171	                        "from your current password."
+172	                    )
+173	                }
+174	            )
+175	        return attrs
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 3884
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 4
+		Medium: 1
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 1
+		High: 4
+Files skipped (0):

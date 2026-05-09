@@ -6,8 +6,7 @@ from django.db.models            import Q
 
 from .models       import Listing
 from .serializers  import ListingSerializer, ListingListSerializer
-from apps.users.permissions import IsAdminOrTravelAgent
-
+from apps.users.permissions import IsAdminOrTravelAgent, IsAdminOrManager
 
 # ── Public: Browse All Listings ───────────────────────────────────
 class ListingListView(generics.ListAPIView):
@@ -227,3 +226,82 @@ class ListingAvailabilityView(APIView):
             "is_available":    listing.is_available,
             "percent_booked":  percent_booked,
         })
+    
+
+# ── Travel Agent / Admin: Edit listing fields ─────────────────────
+class ListingEditView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminOrTravelAgent]
+
+    def patch(self, request, pk):
+        try:
+            listing = Listing.objects.get(pk=pk)
+        except Listing.DoesNotExist:
+            return Response({"error": "Listing not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role == "TRAVEL_AGENT" and listing.created_by != request.user:
+            return Response({"error": "You can only edit your own listings."}, status=status.HTTP_403_FORBIDDEN)
+
+        allowed_fields = [
+            "title", "description", "price_per_person", "discount_percent",
+            "available_seats", "image_url",
+            "includes_hotel", "includes_flight", "includes_meals",
+        ]
+        data = {k: v for k, v in request.data.items() if k in allowed_fields}
+
+        serializer = ListingSerializer(listing, data=data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Listing updated successfully.", "listing": serializer.data})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ── Manager / Admin: Approve a pending listing ────────────────────
+class ListingApproveView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminOrManager]
+
+    def post(self, request, pk):
+        try:
+            listing = Listing.objects.get(pk=pk)
+        except Listing.DoesNotExist:
+            return Response({"error": "Listing not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if listing.status != "PENDING":
+            return Response({"error": "Only PENDING listings can be approved."}, status=status.HTTP_400_BAD_REQUEST)
+
+        listing.status           = "ACTIVE"
+        listing.rejection_reason = ""
+        listing.save()
+        return Response({"message": f'"{listing.title}" has been approved and is now live.'})
+
+
+# ── Manager / Admin: Reject a pending listing ─────────────────────
+class ListingRejectView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminOrManager]
+
+    def post(self, request, pk):
+        try:
+            listing = Listing.objects.get(pk=pk)
+        except Listing.DoesNotExist:
+            return Response({"error": "Listing not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        reason = request.data.get("reason", "").strip()
+        if not reason:
+            return Response({"error": "A rejection reason is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if listing.status != "PENDING":
+            return Response({"error": "Only PENDING listings can be rejected."}, status=status.HTTP_400_BAD_REQUEST)
+
+        listing.status           = "INACTIVE"
+        listing.rejection_reason = reason
+        listing.save()
+        return Response({"message": f'"{listing.title}" has been rejected.', "reason": reason})
+
+
+# ── Manager / Admin: Get all pending listings ─────────────────────
+class ListingPendingView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminOrManager]
+
+    def get(self, request):
+        pending = Listing.objects.filter(status="PENDING").select_related("created_by")
+        data    = ListingSerializer(pending, many=True).data
+        return Response(data)

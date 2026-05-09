@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+
+<title>
+    Bandit Report
+</title>
+
+<style>
+
+html * {
+    font-family: "Arial", sans-serif;
+}
+
+pre {
+    font-family: "Monaco", monospace;
+}
+
+.bordered-box {
+    border: 1px solid black;
+    padding-top:.5em;
+    padding-bottom:.5em;
+    padding-left:1em;
+}
+
+.metrics-box {
+    font-size: 1.1em;
+    line-height: 130%;
+}
+
+.metrics-title {
+    font-size: 1.5em;
+    font-weight: 500;
+    margin-bottom: .25em;
+}
+
+.issue-description {
+    font-size: 1.3em;
+    font-weight: 500;
+}
+
+.candidate-issues {
+    margin-left: 2em;
+    border-left: solid 1px; LightGray;
+    padding-left: 5%;
+    margin-top: .2em;
+    margin-bottom: .2em;
+}
+
+.issue-block {
+    border: 1px solid LightGray;
+    padding-left: .5em;
+    padding-top: .5em;
+    padding-bottom: .5em;
+    margin-bottom: .5em;
+}
+
+.issue-sev-high {
+    background-color: Pink;
+}
+
+.issue-sev-medium {
+    background-color: NavajoWhite;
+}
+
+.issue-sev-low {
+    background-color: LightCyan;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="metrics">
+    <div class="metrics-box bordered-box">
+        <div class="metrics-title">
+            Metrics:<br>
+        </div>
+        Total lines of code: <span id="loc">3884</span><br>
+        Total lines skipped (#nosec): <span id="nosec">0</span>
+    </div>
+</div>
+
+
+
+
+<br>
+<div id="results">
+    
+<div id="issue-0">
+<div class="issue-block issue-sev-medium">
+    <b>blacklist: </b> Use of mark_safe() may expose cross-site scripting vulnerabilities and should be reviewed.<br>
+    <b>Test ID:</b> B308<br>
+    <b>Severity: </b>MEDIUM<br>
+    <b>Confidence: </b>HIGH<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/79.html" target="_blank">CWE-79</a><br>
+    <b>File: </b><a href="apps/listings\admin.py" target="_blank">apps/listings\admin.py</a><br>
+    <b>Line number: </b>347<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b308-mark-safe" target="_blank">https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b308-mark-safe</a><br>
+
+<div class="code">
+<pre>
+346	            from django.utils.safestring import mark_safe
+347	            context[&quot;autofill_html_safe&quot;] = mark_safe(autofill_html)
+348	
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-1">
+<div class="issue-block issue-sev-low">
+    <b>blacklist: </b> Standard pseudo-random generators are not suitable for security/cryptographic purposes.<br>
+    <b>Test ID:</b> B311<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>HIGH<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/330.html" target="_blank">CWE-330</a><br>
+    <b>File: </b><a href="apps/payments\services.py" target="_blank">apps/payments\services.py</a><br>
+    <b>Line number: </b>25<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random" target="_blank">https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random</a><br>
+
+<div class="code">
+<pre>
+24	        chars = string.ascii_uppercase + string.digits
+25	        return &quot;TXN-&quot; + &quot;&quot;.join(random.choices(chars, k=12))
+26	
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-2">
+<div class="issue-block issue-sev-low">
+    <b>blacklist: </b> Standard pseudo-random generators are not suitable for security/cryptographic purposes.<br>
+    <b>Test ID:</b> B311<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>HIGH<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/330.html" target="_blank">CWE-330</a><br>
+    <b>File: </b><a href="apps/payments\services.py" target="_blank">apps/payments\services.py</a><br>
+    <b>Line number: </b>103<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random" target="_blank">https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random</a><br>
+
+<div class="code">
+<pre>
+102	        # In real Stripe, success/failure comes from the bank
+103	        success = random.random() &gt; 0.1
+104	        #success = True  # For testing, we can force success
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-3">
+<div class="issue-block issue-sev-low">
+    <b>blacklist: </b> Standard pseudo-random generators are not suitable for security/cryptographic purposes.<br>
+    <b>Test ID:</b> B311<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>HIGH<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/330.html" target="_blank">CWE-330</a><br>
+    <b>File: </b><a href="apps/users\otp.py" target="_blank">apps/users\otp.py</a><br>
+    <b>Line number: </b>11<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random" target="_blank">https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random</a><br>
+
+<div class="code">
+<pre>
+10	    &quot;&quot;&quot;Generate a 6-digit numeric OTP code.&quot;&quot;&quot;
+11	    return &quot;&quot;.join(random.choices(string.digits, k=6))
+12	
+</pre>
+</div>
+
+
+</div>
+</div>
+
+<div id="issue-4">
+<div class="issue-block issue-sev-low">
+    <b>hardcoded_password_string: </b> Possible hardcoded password: 'New password must be different from your current password.'<br>
+    <b>Test ID:</b> B105<br>
+    <b>Severity: </b>LOW<br>
+    <b>Confidence: </b>MEDIUM<br>
+    <b>CWE: </b><a href="https://cwe.mitre.org/data/definitions/259.html" target="_blank">CWE-259</a><br>
+    <b>File: </b><a href="apps/users\serializers.py" target="_blank">apps/users\serializers.py</a><br>
+    <b>Line number: </b>169<br>
+    <b>More info: </b><a href="https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html" target="_blank">https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html</a><br>
+
+<div class="code">
+<pre>
+168	                {
+169	                    &quot;new_password&quot;: (
+170	                        &quot;New password must be different &quot;
+171	                        &quot;from your current password.&quot;
+172	                    )
+173	                }
+174	            )
+175	        return attrs
+</pre>
+</div>
+
+
+</div>
+</div>
+
+</div>
+
+</body>
+</html>

@@ -344,7 +344,7 @@ class ListingAdmin(admin.ModelAdmin):
 
             # Override the submit row to add our box above the form
             from django.utils.safestring import mark_safe
-            context["autofill_html_safe"] = mark_safe(autofill_html)
+            context["autofill_html_safe"] = mark_safe(autofill_html)    # nosec B308 - HTML generated internally, not from user input
 
         response = super().render_change_form(request, context, add, change, form_url, obj)
 

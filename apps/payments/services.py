@@ -21,8 +21,9 @@ class MockPaymentProcessor:
     @staticmethod
     def generate_transaction_id():
         """Generate a fake transaction ID like a real gateway would."""
+        import secrets
         chars = string.ascii_uppercase + string.digits
-        return "TXN-" + "".join(random.choices(chars, k=12))
+        return "TXN-" + "".join(secrets.choice(chars) for _ in range(12))
 
     @staticmethod
     def validate_card(card_number, expiry, cvv):
@@ -100,7 +101,8 @@ class MockPaymentProcessor:
 
         # Step 3 — Simulate 90% success rate
         # In real Stripe, success/failure comes from the bank
-        success = random.random() > 0.1
+        import secrets
+        success = secrets.randbelow(100) > 0.1
         #success = True  # For testing, we can force success
 
         if success:

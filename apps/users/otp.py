@@ -8,7 +8,8 @@ from django.conf       import settings
 
 def generate_otp():
     """Generate a 6-digit numeric OTP code."""
-    return "".join(random.choices(string.digits, k=6))
+    import secrets
+    return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
 def send_otp_email(user, otp_code):

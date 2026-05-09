@@ -3,17 +3,13 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class Listing(models.Model):
-    """
-    Represents a travel product — can be a package, hotel, or flight.
-    Travel agents and admins create these. Customers browse and book them.
-    """
-
     class ListingType(models.TextChoices):
         PACKAGE = "PACKAGE", "Travel Package"
         HOTEL   = "HOTEL",   "Hotel"
         FLIGHT  = "FLIGHT",  "Flight"
 
     class Status(models.TextChoices):
+        PENDING  = "PENDING",  "Pending Approval"   # NEW — Travel Agent submitted, awaiting Manager
         ACTIVE   = "ACTIVE",   "Active"
         INACTIVE = "INACTIVE", "Inactive"
         SOLDOUT  = "SOLDOUT",  "Sold Out"
@@ -22,15 +18,14 @@ class Listing(models.Model):
     title        = models.CharField(max_length=255)
     description  = models.TextField()
     listing_type = models.CharField(
-        max_length=20,
-        choices=ListingType.choices,
-        default=ListingType.PACKAGE,
+        max_length=20, choices=ListingType.choices, default=ListingType.PACKAGE,
     )
     status = models.CharField(
-        max_length=20,
-        choices=Status.choices,
-        default=Status.ACTIVE,
+        max_length=20, choices=Status.choices, default=Status.PENDING,  # default is now PENDING
     )
+
+    # NEW — stores the reason when a Manager rejects a listing
+    rejection_reason = models.TextField(blank=True, default="")
 
     # ── Location ──────────────────────────────────────────────────
     origin      = models.CharField(max_length=100)
@@ -40,24 +35,18 @@ class Listing(models.Model):
 
     # ── Pricing ───────────────────────────────────────────────────
     price_per_person = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        validators=[MinValueValidator(0)]
+        max_digits=10, decimal_places=2, validators=[MinValueValidator(0)]
     )
     discount_percent = models.DecimalField(
-        max_digits=5, decimal_places=2,
-        default=0,
+        max_digits=5, decimal_places=2, default=0,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
 
     # ── Availability ──────────────────────────────────────────────
-    available_seats = models.IntegerField(
-        validators=[MinValueValidator(0)]
-    )
-    max_seats  = models.IntegerField(
-        validators=[MinValueValidator(1)]
-    )
-    start_date = models.DateField()
-    end_date   = models.DateField()
+    available_seats = models.IntegerField(validators=[MinValueValidator(0)])
+    max_seats       = models.IntegerField(validators=[MinValueValidator(1)])
+    start_date      = models.DateField()
+    end_date        = models.DateField()
 
     # ── Details ───────────────────────────────────────────────────
     duration_days   = models.IntegerField(validators=[MinValueValidator(1)])
@@ -66,67 +55,33 @@ class Listing(models.Model):
     includes_meals  = models.BooleanField(default=False)
 
     # ── Images ────────────────────────────────────────────────────
-    image = models.ImageField(
-        upload_to="listings/", blank=True, null=True
-    )
+    image     = models.ImageField(upload_to="listings/", blank=True, null=True)
     image_url = models.URLField(
         max_length=500, blank=True, null=True,
-        help_text="Direct URL to listing image — paste any photo link here"
+        help_text="Direct URL to listing image"
     )
 
-# ── External Booking URLs ─────────────────────────────────────
-    booking_com_url  = models.URLField(
-        max_length=500, blank=True, null=True,
-        help_text="Paste exact Booking.com URL for this listing"
-    )
-    agoda_url        = models.URLField(
-        max_length=500, blank=True, null=True,
-        help_text="Paste exact Agoda URL for this listing"
-    )
-    skyscanner_url   = models.URLField(
-        max_length=500, blank=True, null=True,
-        help_text="Paste exact Skyscanner URL for this flight"
-    )
-    expedia_url      = models.URLField(
-        max_length=500, blank=True, null=True,
-        help_text="Paste exact Expedia URL for this listing"
-    )
+    # ── External Booking URLs ─────────────────────────────────────
+    booking_com_url = models.URLField(max_length=500, blank=True, null=True)
+    agoda_url       = models.URLField(max_length=500, blank=True, null=True)
+    skyscanner_url  = models.URLField(max_length=500, blank=True, null=True)
+    expedia_url     = models.URLField(max_length=500, blank=True, null=True)
 
-# ── External Platform Prices (for comparison table) ──────────
-    booking_com_price = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        blank=True, null=True,
-        help_text="Price shown on Booking.com (for comparison)"
-    )
-    agoda_price = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        blank=True, null=True,
-        help_text="Price shown on Agoda (for comparison)"
-    )
-    expedia_price = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        blank=True, null=True,
-        help_text="Price shown on Expedia (for comparison)"
-    )
-    skyscanner_price = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        blank=True, null=True,
-        help_text="Price shown on Skyscanner (for comparison)"
-    )
+    # ── External Platform Prices ──────────────────────────────────
+    booking_com_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    agoda_price       = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    expedia_price     = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    skyscanner_price  = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     # ── Rating ────────────────────────────────────────────────────
     rating = models.DecimalField(
-        max_digits=3, decimal_places=1,
-        default=0.0,
+        max_digits=3, decimal_places=1, default=0.0,
         validators=[MinValueValidator(0), MaxValueValidator(5)]
     )
 
     # ── Who created it ────────────────────────────────────────────
     created_by = models.ForeignKey(
-        "users.User",
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="listings",
+        "users.User", on_delete=models.SET_NULL, null=True, related_name="listings",
     )
 
     # ── Timestamps ────────────────────────────────────────────────
@@ -134,18 +89,16 @@ class Listing(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table         = "listings"
-        ordering         = ["-created_at"]
-        verbose_name     = "Listing"
+        db_table            = "listings"
+        ordering            = ["-created_at"]
+        verbose_name        = "Listing"
         verbose_name_plural = "Listings"
 
     def __str__(self):
         return f"{self.title} ({self.listing_type}) - ${self.price_per_person}"
 
-    # ── Computed properties ───────────────────────────────────────
     @property
     def discounted_price(self):
-        """Final price after discount."""
         if self.discount_percent > 0:
             discount = self.price_per_person * (self.discount_percent / 100)
             return round(self.price_per_person - discount, 2)
@@ -153,13 +106,8 @@ class Listing(models.Model):
 
     @property
     def is_available(self):
-        """Check if seats are available."""
-        return (
-            self.available_seats > 0
-            and self.status == self.Status.ACTIVE
-        )
+        return self.available_seats > 0 and self.status == self.Status.ACTIVE
 
     @property
     def seats_booked(self):
-        """How many seats have been booked."""
         return self.max_seats - self.available_seats
