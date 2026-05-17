@@ -128,16 +128,33 @@ class ListingDetailView(APIView):
 
 # ── Admin/Agent: Create Listing ───────────────────────────────────
 class ListingCreateView(APIView):
+    """
+    Admin creates listings → goes live immediately as ACTIVE.
+    Travel Agent creates listings → goes to PENDING for Manager approval.
+    """
     permission_classes = [IsAuthenticated, IsAdminOrTravelAgent]
 
     def post(self, request):
         serializer = ListingSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(created_by=request.user)
+            # Admin listings go live immediately — Travel Agent listings need approval
+            if request.user.role == "ADMIN":
+                listing = serializer.save(
+                    created_by=request.user,
+                    status="ACTIVE"
+                )
+                message = "Listing created successfully and is now live."
+            else:
+                listing = serializer.save(
+                    created_by=request.user,
+                    status="PENDING"
+                )
+                message = "Listing submitted successfully and is awaiting Manager approval."
+
             return Response(
                 {
-                    "message": "Listing created successfully.",
-                    "listing": serializer.data,
+                    "message": message,
+                    "listing": ListingSerializer(listing).data,
                 },
                 status=status.HTTP_201_CREATED,
             )
@@ -193,8 +210,9 @@ class ListingManageView(APIView):
             {"message": "Listing deactivated successfully."},
             status=status.HTTP_200_OK,
         )
-    
-    # ── Public: Real Time Availability ───────────────────────────────
+
+
+# ── Public: Real Time Availability ────────────────────────────────
 class ListingAvailabilityView(APIView):
     """
     Returns real time seat availability for a listing.
@@ -226,7 +244,7 @@ class ListingAvailabilityView(APIView):
             "is_available":    listing.is_available,
             "percent_booked":  percent_booked,
         })
-    
+
 
 # ── Travel Agent / Admin: Edit listing fields ─────────────────────
 class ListingEditView(APIView):
