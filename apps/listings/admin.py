@@ -12,16 +12,18 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib.admin.views.decorators import staff_member_required
 
+
 @staff_member_required
 @require_POST
 def ai_autofill_view(request):
     """
     Called by the admin form when admin clicks the AI Autofill button.
-    Takes destination + listing_type and returns suggested field values.
+    Takes destination + listing_type and returns suggested field values
+    including SafeNest price AND competitor prices for comparison table.
     """
     try:
-        data        = json.loads(request.body)
-        destination = data.get("destination", "").strip()
+        data         = json.loads(request.body)
+        destination  = data.get("destination", "").strip()
         listing_type = data.get("listing_type", "PACKAGE").strip()
 
         if not destination:
@@ -46,18 +48,25 @@ def ai_autofill_view(request):
             "  \"includes_hotel\": true,\n"
             "  \"includes_flight\": true,\n"
             "  \"includes_meals\": false,\n"
-            "  \"image_url\": \"https://images.unsplash.com/photo-... (relevant unsplash photo URL)\"\n"
+            "  \"image_url\": \"https://images.unsplash.com/photo-... (relevant unsplash photo URL)\",\n"
+            "  \"booking_com_price\": 1450,\n"
+            "  \"agoda_price\": 1380,\n"
+            "  \"expedia_price\": 1500,\n"
+            "  \"skyscanner_price\": 1320\n"
             "}\n\n"
             "Rules:\n"
-            "- Price should be realistic in USD for an Australian traveller\n"
+            "- price_per_person is SafeNest price — make it CHEAPEST option\n"
+            "- Competitor prices (booking_com_price, agoda_price, expedia_price, skyscanner_price)\n"
+            "  should each be 10-30 percent HIGHER than price_per_person\n"
+            "- For HOTEL: includes_hotel=true, includes_flight=false\n"
+            "- For FLIGHT: includes_flight=true, includes_hotel=false\n"
+            "- For PACKAGE: includes_hotel=true, includes_flight=true\n"
+            "- All prices in USD, realistic for Australian traveller\n"
             "- Duration should be realistic for the destination\n"
-            "- For HOTEL type: includes_hotel=true, includes_flight=false\n"
-            "- For FLIGHT type: includes_flight=true, includes_hotel=false\n"
-            "- For PACKAGE type: includes_hotel=true, includes_flight=true\n"
             "- Use a real Unsplash photo URL relevant to the destination"
         )
 
-        response  = client.models.generate_content(
+        response = client.models.generate_content(
             model="gemini-flash-latest",
             contents=prompt
         )
@@ -70,10 +79,7 @@ def ai_autofill_view(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-# ── Register URL for the autofill view ───────────────────────────
-# We add this URL inside the admin class below using get_urls()
-
-
+# ── Listing Admin ─────────────────────────────────────────────────
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
     list_display  = [
@@ -114,6 +120,23 @@ class ListingAdmin(admin.ModelAdmin):
             "fields": ("booking_com_url", "agoda_url", "skyscanner_url", "expedia_url"),
             "classes": ("collapse",),
         }),
+        # ── NEW SECTION — Competitor prices for comparison table ─
+        # Enter competitor prices here. When customers view a listing,
+        # they see a price comparison table showing SafeNest vs these.
+        # AI Autofill fills these automatically when creating new listings.
+        ("💰 Competitor Prices (Price Comparison Table)", {
+            "description": (
+                "Enter competitor prices here to enable the price comparison "
+                "table on the listing detail page. The customer will see "
+                "SafeNest's price vs these competitor prices side by side."
+            ),
+            "fields": (
+                "booking_com_price",
+                "agoda_price",
+                "expedia_price",
+                "skyscanner_price",
+            ),
+        }),
         ("Rating & Meta", {
             "fields": ("rating", "created_at", "updated_at"),
             "classes": ("collapse",),
@@ -135,7 +158,7 @@ class ListingAdmin(admin.ModelAdmin):
 
     # ── Inject AI autofill button + JS into the admin change form ──
     # This adds a floating green button at the top of the Add Listing page
-    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
         extra_context = extra_context or {}
 
         # Only show autofill on the ADD page (not edit page)
@@ -150,12 +173,13 @@ class ListingAdmin(admin.ModelAdmin):
         js  = ()  # JS is injected inline via the template below
 
     # ── Override save to attach JS to the form ────────────────────
-    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
         """
         Injects the AI autofill button and JavaScript directly into
         the Add Listing admin form. The button appears at the top of
         the form. When clicked it reads the destination field, calls
-        the Gemini API endpoint, and fills in all form fields.
+        the Gemini API endpoint, and fills in all form fields including
+        competitor prices for the comparison table.
         """
         if add:
             # Build the autofill button HTML + JavaScript
@@ -226,7 +250,7 @@ class ListingAdmin(admin.ModelAdmin):
 
             <div id="ai-autofill-box">
                 <h3>✨ AI Autofill — Powered by Gemini</h3>
-                <p>Type a destination and select listing type, then click Autofill. Gemini will automatically fill in the title, description, country, city, price and more.</p>
+                <p>Type a destination and select listing type, then click Autofill. Gemini will automatically fill in the title, description, country, city, SafeNest price AND competitor prices for the comparison table.</p>
                 <div id="autofill-row">
                     <input
                         type="text"
@@ -268,13 +292,13 @@ class ListingAdmin(admin.ModelAdmin):
                 const status      = document.getElementById('autofill-status');
 
                 if (!destination) {
-                    status.innerHTML = '<span style="color:#ffcccc;">⚠️ Please type a destination first.</span>';
+                    status.innerHTML = '<span style="color:#ffcccc;">Please type a destination first.</span>';
                     return;
                 }
 
                 // Show loading state
                 btn.disabled     = true;
-                btn.textContent  = '⏳ Generating...';
+                btn.textContent  = 'Generating...';
                 status.innerHTML = '<span style="opacity:0.8;">Gemini is generating listing details for ' + destination + '...</span>';
 
                 try {
@@ -295,16 +319,24 @@ class ListingAdmin(admin.ModelAdmin):
                     if (result.success) {
                         const d = result.data;
 
-                        // Fill all the form fields automatically
-                        setField('id_title',            d.title          || '');
-                        setField('id_description',      d.description    || '');
-                        setField('id_country',          d.country        || '');
-                        setField('id_city',             d.city           || '');
-                        setField('id_origin',           d.origin         || 'Sydney');
+                        // ── Fill basic listing fields ─────────────────
+                        setField('id_title',            d.title           || '');
+                        setField('id_description',      d.description     || '');
+                        setField('id_country',          d.country         || '');
+                        setField('id_city',             d.city            || '');
+                        setField('id_origin',           d.origin          || 'Sydney');
                         setField('id_destination',      destination);
-                        setField('id_price_per_person', d.price_per_person || '');
-                        setField('id_duration_days',    d.duration_days  || '7');
-                        setField('id_image_url',        d.image_url      || '');
+                        setField('id_price_per_person', d.price_per_person|| '');
+                        setField('id_duration_days',    d.duration_days   || '7');
+                        setField('id_image_url',        d.image_url       || '');
+
+                        // ── Fill competitor prices for comparison ─────
+                        // These power the price comparison table on the
+                        // listing detail page
+                        setField('id_booking_com_price', d.booking_com_price || '');
+                        setField('id_agoda_price',       d.agoda_price       || '');
+                        setField('id_expedia_price',     d.expedia_price     || '');
+                        setField('id_skyscanner_price',  d.skyscanner_price  || '');
 
                         // Set listing type dropdown
                         const typeField = document.getElementById('id_listing_type');
@@ -315,15 +347,15 @@ class ListingAdmin(admin.ModelAdmin):
                         setCheckbox('id_includes_flight', d.includes_flight);
                         setCheckbox('id_includes_meals',  d.includes_meals);
 
-                        status.innerHTML = '<span style="color:#aaffcc;">✅ Fields filled! Please review and adjust before saving.</span>';
+                        status.innerHTML = '<span style="color:#aaffcc;">All fields filled including competitor prices! Please review and adjust before saving.</span>';
                     } else {
-                        status.innerHTML = '<span style="color:#ffcccc;">❌ Error: ' + (result.error || 'Unknown error') + '</span>';
+                        status.innerHTML = '<span style="color:#ffcccc;">Error: ' + (result.error || 'Unknown error') + '</span>';
                     }
                 } catch (err) {
-                    status.innerHTML = '<span style="color:#ffcccc;">❌ Failed to connect. Check if Django is running.</span>';
+                    status.innerHTML = '<span style="color:#ffcccc;">Failed to connect. Check if Django is running.</span>';
                 } finally {
                     btn.disabled    = false;
-                    btn.textContent = '✨ Autofill with AI';
+                    btn.textContent = 'Autofill with AI';
                 }
             }
 
@@ -343,16 +375,15 @@ class ListingAdmin(admin.ModelAdmin):
             context["autofill_html"] = autofill_html
 
             # Override the submit row to add our box above the form
-            from django.utils.safestring import mark_safe
             import html
-            context["autofill_html_safe"] = html.escape(autofill_html)    # nosec B308 - HTML generated internally, not from user input
+            context["autofill_html_safe"] = html.escape(autofill_html)  # nosec B308
 
         response = super().render_change_form(request, context, add, change, form_url, obj)
 
         # Inject autofill box directly into the response content
-        if add and hasattr(response, 'content'):
-            content = response.content.decode('utf-8')
-            # Insert autofill box right after the opening <form> tag
+        if add and hasattr(response, "content"):
+            content = response.content.decode("utf-8")
+            # Insert autofill box right after the opening content-main div
             insert_after = '<div id="content-main">'
             if insert_after in content:
                 content = content.replace(
@@ -360,6 +391,6 @@ class ListingAdmin(admin.ModelAdmin):
                     insert_after + autofill_html,
                     1
                 )
-            response.content = content.encode('utf-8')
+            response.content = content.encode("utf-8")
 
         return response
